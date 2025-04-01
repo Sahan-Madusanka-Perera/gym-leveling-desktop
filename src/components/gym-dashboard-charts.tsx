@@ -1,0 +1,250 @@
+"use client"
+import React, { useState } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+
+// Mock data - in production, you would fetch this from your database
+const memberActivityData = [
+  { name: 'Jan', workouts: 65, attendance: 78, xp: 420 },
+  { name: 'Feb', workouts: 59, attendance: 70, xp: 380 },
+  { name: 'Mar', workouts: 80, attendance: 89, xp: 510 },
+  { name: 'Apr', workouts: 81, attendance: 86, xp: 535 },
+  { name: 'May', workouts: 56, attendance: 65, xp: 400 },
+  { name: 'Jun', workouts: 55, attendance: 68, xp: 390 },
+  { name: 'Jul', workouts: 40, attendance: 58, xp: 300 },
+  { name: 'Aug', workouts: 72, attendance: 82, xp: 480 },
+  { name: 'Sep', workouts: 78, attendance: 85, xp: 520 },
+  { name: 'Oct', workouts: 85, attendance: 90, xp: 550 }
+];
+
+const levelDistributionData = [
+  { name: 'Level 1', value: 45, color: '#8884d8' },
+  { name: 'Level 2', value: 32, color: '#83a6ed' },
+  { name: 'Level 3', value: 18, color: '#8dd1e1' },
+  { name: 'Level 4', value: 8, color: '#82ca9d' },
+  { name: 'Level 5+', value: 5, color: '#a4de6c' }
+];
+
+const popularExercisesData = [
+  { name: 'Bench Press', count: 320 },
+  { name: 'Squats', count: 280 },
+  { name: 'Deadlift', count: 250 },
+  { name: 'Pull Ups', count: 210 },
+  { name: 'Shoulder Press', count: 190 }
+];
+
+const userActivityByTimeData = [
+  { time: '6-8 AM', users: 25 },
+  { time: '8-10 AM', users: 40 },
+  { time: '10-12 PM', users: 30 },
+  { time: '12-2 PM', users: 45 },
+  { time: '2-4 PM', users: 50 },
+  { time: '4-6 PM', users: 70 },
+  { time: '6-8 PM', users: 90 },
+  { time: '8-10 PM', users: 65 }
+];
+
+const GymDashboardCharts = () => {
+  const [timeframe, setTimeframe] = useState('monthly');
+
+  return (
+    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      {/* XP and Leveling Chart */}
+      <Card className="col-span-2">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <div>
+            <CardTitle>Member Progression</CardTitle>
+            <CardDescription>XP gained and attendance over time</CardDescription>
+          </div>
+          <Select defaultValue={timeframe} onValueChange={setTimeframe}>
+            <SelectTrigger className="w-36">
+              <SelectValue placeholder="Select timeframe" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="weekly">Weekly</SelectItem>
+              <SelectItem value="monthly">Monthly</SelectItem>
+              <SelectItem value="yearly">Yearly</SelectItem>
+            </SelectContent>
+          </Select>
+        </CardHeader>
+        <CardContent className="pt-6">
+          <ResponsiveContainer width="100%" height={350}>
+            <LineChart
+              data={memberActivityData}
+              margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="name" />
+              <YAxis yAxisId="left" />
+              <YAxis yAxisId="right" orientation="right" />
+              <Tooltip />
+              <Legend />
+              <Line yAxisId="left" type="monotone" dataKey="xp" stroke="#8884d8" name="XP Gained" strokeWidth={2} activeDot={{ r: 8 }} />
+              <Line yAxisId="right" type="monotone" dataKey="attendance" stroke="#82ca9d" name="Check-ins" strokeWidth={2} />
+            </LineChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+
+      {/* Level Distribution */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Level Distribution</CardTitle>
+          <CardDescription>Member levels breakdown</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={220}>
+            <PieChart>
+              <Pie
+                data={levelDistributionData}
+                cx="50%"
+                cy="50%"
+                innerRadius={60}
+                outerRadius={80}
+                fill="#8884d8"
+                paddingAngle={5}
+                dataKey="value"
+                label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
+              >
+                {levelDistributionData.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={entry.color} />
+                ))}
+              </Pie>
+              <Tooltip formatter={(value) => [`${value} members`, 'Count']} />
+            </PieChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+
+      {/* Popular Exercises */}
+      <Card className="col-span-2">
+        <CardHeader>
+          <CardTitle>Top Exercises</CardTitle>
+          <CardDescription>Most popular exercises among members</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart
+              data={popularExercisesData}
+              margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="name" />
+              <YAxis />
+              <Tooltip />
+              <Legend />
+              <Bar dataKey="count" name="Usage Count" fill="#8884d8" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+
+      {/* Gym Traffic by Time */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Gym Traffic</CardTitle>
+          <CardDescription>Members by time of day</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart
+              data={userActivityByTimeData}
+              margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+              layout="vertical"
+            >
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis type="number" />
+              <YAxis type="category" dataKey="time" />
+              <Tooltip />
+              <Legend />
+              <Bar dataKey="users" name="Members" fill="#82ca9d" radius={[0, 4, 4, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+
+      {/* Activity Details Tabs */}
+      <Card className="col-span-3">
+        <CardHeader>
+          <CardTitle>Activity Details</CardTitle>
+          <CardDescription>Workouts, exercises, and leveling metrics</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Tabs defaultValue="workouts">
+            <TabsList className="mb-4">
+              <TabsTrigger value="workouts">Workouts</TabsTrigger>
+              <TabsTrigger value="exercises">Exercise Types</TabsTrigger>
+              <TabsTrigger value="leveling">Leveling Progress</TabsTrigger>
+            </TabsList>
+            <TabsContent value="workouts" className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart
+                  data={memberActivityData}
+                  margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" />
+                  <YAxis />
+                  <Tooltip />
+                  <Legend />
+                  <Line type="monotone" dataKey="workouts" stroke="#ff7300" name="Workouts Completed" activeDot={{ r: 8 }} />
+                </LineChart>
+              </ResponsiveContainer>
+            </TabsContent>
+            <TabsContent value="exercises" className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={[
+                    { category: 'Cardio', count: 420 },
+                    { category: 'Strength', count: 680 },
+                    { category: 'Flexibility', count: 230 },
+                    { category: 'Balance', count: 180 },
+                    { category: 'HIIT', count: 310 }
+                  ]}
+                  margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="category" />
+                  <YAxis />
+                  <Tooltip />
+                  <Legend />
+                  <Bar dataKey="count" name="Exercise Count" fill="#8884d8" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </TabsContent>
+            <TabsContent value="leveling" className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart
+                  data={[
+                    { month: 'Jan', newLevelUps: 24 },
+                    { month: 'Feb', newLevelUps: 18 },
+                    { month: 'Mar', newLevelUps: 32 },
+                    { month: 'Apr', newLevelUps: 27 },
+                    { month: 'May', newLevelUps: 21 },
+                    { month: 'Jun', newLevelUps: 19 },
+                    { month: 'Jul', newLevelUps: 16 },
+                    { month: 'Aug', newLevelUps: 28 },
+                    { month: 'Sep', newLevelUps: 31 },
+                    { month: 'Oct', newLevelUps: 35 }
+                  ]}
+                  margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="month" />
+                  <YAxis />
+                  <Tooltip />
+                  <Legend />
+                  <Line type="monotone" dataKey="newLevelUps" stroke="#82ca9d" name="New Level Ups" strokeWidth={2} activeDot={{ r: 8 }} />
+                </LineChart>
+              </ResponsiveContainer>
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
+export default GymDashboardCharts;
