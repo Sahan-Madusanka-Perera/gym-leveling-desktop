@@ -2,7 +2,8 @@
 import { z } from "zod"
 
 export const memberSchema = z.object({
-  id: z.number().or(z.string()).transform((val) => Number(val)),
+  id: z.number().or(z.string()).transform((val) => Number(val)).optional(),
+  member_id: z.number().optional(),
   name: z.string(),
   email: z.string().nullable(),
   gender: z.string(),

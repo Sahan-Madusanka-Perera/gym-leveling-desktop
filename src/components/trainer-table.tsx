@@ -59,6 +59,39 @@ import { useRouter } from "next/navigation"
 import { type Trainer, type TrainerWithTempId } from "@/types/trainer"
 import { EditTrainerDialog } from "./edit-trainer-dialog"
 
+// Function to set up RLS policies
+async function setupRlsPolicies() {
+  try {
+    const toastId = toast.loading("Setting up RLS policies...");
+    
+    const response = await fetch('/api/setup-rls-policy', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      toast.dismiss(toastId);
+      toast.error(errorData.message || 'Failed to set up RLS policies');
+      throw new Error(errorData.message || 'Failed to set up RLS policies');
+    }
+    
+    const result = await response.json();
+    toast.dismiss(toastId);
+    toast.success("RLS policies set up successfully", {
+      description: "You can now add, edit, and delete trainers"
+    });
+    
+    // Return the result
+    return result;
+  } catch (error) {
+    console.error('Error setting up RLS policies:', error);
+    throw error;
+  }
+}
+
 export function TrainerTable({ data: initialData }: { data: Trainer[] }) {
   const router = useRouter()
   
@@ -189,7 +222,10 @@ export function TrainerTable({ data: initialData }: { data: Trainer[] }) {
               <DropdownMenuItem
                 onClick={() => {
                   navigator.clipboard.writeText(String(trainer.id))
-                  toast.success("Copied to clipboard")
+                  toast.success("Copied to clipboard", {
+                    description: `Trainer ID: ${trainer.id}`,
+                    icon: "📋"
+                  })
                 }}
               >
                 Copy trainer ID
@@ -198,24 +234,52 @@ export function TrainerTable({ data: initialData }: { data: Trainer[] }) {
               <DropdownMenuItem
                 onClick={async () => {
                   try {
+                    const trainerName = trainer.name;
+                    
                     // Only attempt to delete if ID is numeric
                     if (typeof trainer.id === 'number') {
+                      const toastId = toast.loading("Deleting trainer...", {
+                        description: `Removing ${trainerName} from the system`,
+                        icon: "⏳"
+                      });
+                      
                       await deleteTrainers([trainer.id])
-                      toast.success("Trainer deleted successfully")
+                      
+                      toast.dismiss(toastId);
+                      toast.success("Trainer deleted", {
+                        description: `${trainerName} was successfully removed`,
+                        icon: "🗑️"
+                      })
                       router.refresh()
                     } else {
                       // Try to convert string ID to number if possible
                       const numericId = parseInt(String(trainer.id), 10)
                       if (!isNaN(numericId)) {
+                        const toastId = toast.loading("Deleting trainer...", {
+                          description: `Removing ${trainerName} from the system`,
+                          icon: "⏳"
+                        });
+                        
                         await deleteTrainers([numericId])
-                        toast.success("Trainer deleted successfully")
+                        
+                        toast.dismiss(toastId);
+                        toast.success("Trainer deleted", {
+                          description: `${trainerName} was successfully removed`,
+                          icon: "🗑️"
+                        })
                         router.refresh()
                       } else {
-                        toast.error("Cannot delete: Invalid trainer ID")
+                        toast.error("Cannot delete trainer", {
+                          description: "Invalid trainer ID format",
+                          icon: "❌"
+                        })
                       }
                     }
                   } catch (error) {
-                    toast.error("Failed to delete trainer")
+                    toast.error("Failed to delete trainer", {
+                      description: error instanceof Error ? error.message : "An unexpected error occurred",
+                      icon: "❌"
+                    })
                   }
                 }}
               >
@@ -258,7 +322,10 @@ export function TrainerTable({ data: initialData }: { data: Trainer[] }) {
     const selectedRows = Object.keys(rowSelection)
     
     if (selectedRows.length === 0) {
-      toast.error("No rows selected")
+      toast.error("No trainers selected", {
+        description: "Please select at least one trainer to delete",
+        icon: "ℹ️"
+      })
       return
     }
     
@@ -271,9 +338,14 @@ export function TrainerTable({ data: initialData }: { data: Trainer[] }) {
       .filter((id): id is number => id !== null)
     
     if (validIds.length === 0) {
-      toast.error("No valid trainer IDs to delete")
+      toast.error("No valid trainers to delete", {
+        description: "The selected trainers cannot be deleted due to invalid IDs",
+        icon: "⚠️"
+      })
       return
     }
+    
+    const count = validIds.length;
     
     toast.promise(
       deleteTrainers(validIds).then(() => {
@@ -284,12 +356,12 @@ export function TrainerTable({ data: initialData }: { data: Trainer[] }) {
         setData(newData)
         setRowSelection({})
         router.refresh() // Refresh the page to reflect the changes
-        return `${validIds.length} row(s) deleted successfully`
+        return `${count} ${count === 1 ? 'trainer' : 'trainers'} deleted successfully`
       }),
       {
-        loading: "Deleting selected rows...",
+        loading: `Deleting ${count} ${count === 1 ? 'trainer' : 'trainers'}...`,
         success: (message) => message,
-        error: "Failed to delete rows",
+        error: "Failed to delete trainers"
       }
     )
   }
@@ -340,6 +412,27 @@ export function TrainerTable({ data: initialData }: { data: Trainer[] }) {
             <span className="hidden lg:inline">Delete Selected</span>
           </Button>
           <AddTrainerDialog />
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              toast.promise(
+                setupRlsPolicies().then(() => {
+                  // Refresh the page to reflect the policy changes
+                  router.refresh();
+                  return "RLS policies are now ready!";
+                }),
+                {
+                  loading: "Setting up RLS policies...",
+                  success: (data) => data,
+                  error: (err) => `Failed: ${err.message}`
+                }
+              );
+            }}
+          >
+            <span className="hidden lg:inline">Setup RLS Policy</span>
+            <span className="lg:hidden">RLS</span>
+          </Button>
         </div>
         <div className="flex items-center gap-2">
           <Input

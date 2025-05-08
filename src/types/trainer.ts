@@ -3,10 +3,10 @@ import { z } from "zod"
 // Define schema based on your Supabase Trainer table
 // ID should be trainer_id based on our investigation
 export const trainerSchema = z.object({
-  // Include both id and trainer_id to match Supabase structure
-  // The primary key is actually trainer_id
-  id: z.number(),
-  trainer_id: z.number(),
+  // Make id optional with .optional() for new trainer creation
+  id: z.number().optional(),
+  // Make trainer_id optional with .optional() for new trainer creation
+  trainer_id: z.number().optional(),
   name: z.string(),
   specialization: z.string().nullable(),
   contact: z.string().nullable(),

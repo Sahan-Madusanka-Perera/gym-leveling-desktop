@@ -39,28 +39,47 @@ export async function addTrainer(formData: FormData) {
   const specialization = formData.get("specialization") as string
   const contact = formData.get("contact") as string
 
+  console.log("ADD TRAINER: Starting to add trainer with data:", { name, specialization, contact });
+
   if (!name) {
+    console.error("ADD TRAINER: Name is required but missing");
     throw new Error("Name is required")
   }
 
-  const { data, error } = await supabase
-    .from("Trainer")
-    .insert([
-      {
-        name,
-        specialization: specialization || null,
-        contact: contact || null,
-      },
-    ])
-    .select()
-    .single()
+  try {
+    const payload = {
+      name,
+      specialization: specialization || null,
+      contact: contact || null,
+    };
+    
+    console.log("ADD TRAINER: Sending payload to Supabase:", payload);
+    
+    const { data, error } = await supabase
+      .from("Trainer")
+      .insert([payload])
+      .select()
+      .single()
 
-  if (error) {
-    console.error("Error adding trainer:", error)
-    throw new Error("Failed to add trainer")
+    if (error) {
+      console.error("ADD TRAINER: Error from Supabase:", error);
+      if (error.code === 'PGRST100') {
+        throw new Error("Permission denied: RLS policy is blocking this operation. Please check that proper RLS policies are configured for the Trainer table.");
+      }
+      throw new Error(`Failed to add trainer: ${error.message}`)
+    }
+
+    if (!data) {
+      console.error("ADD TRAINER: No data returned from Supabase");
+      throw new Error("Failed to add trainer: No data returned");
+    }
+
+    console.log("ADD TRAINER: Successfully added trainer:", data);
+    return data as Trainer
+  } catch (error) {
+    console.error("ADD TRAINER: Unexpected error:", error);
+    throw error;
   }
-
-  return data as Trainer
 }
 
 export async function updateTrainer(trainerId: number, formData: FormData) {

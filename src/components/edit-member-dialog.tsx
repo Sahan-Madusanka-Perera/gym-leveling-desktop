@@ -105,36 +105,67 @@ export function EditMemberDialog({ member, open, onOpenChange }: EditMemberDialo
   });
   
   const router = useRouter()
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
   
   // Parse the birth date string to a Date object
-  const birthDate = member.birth_date ? new Date(member.birth_date) : new Date();
+  const birthDate = React.useMemo(() => member.birth_date ? new Date(member.birth_date) : new Date(), [member.birth_date]);
+  
+  // Memoize the form's default values to prevent unnecessary re-renders
+  const defaultValues = React.useMemo(() => ({
+    first_name: member.first_name,
+    last_name: member.last_name,
+    birth_date: birthDate,
+    email: member.email || "",
+    gender: (member.gender?.toLowerCase() as "male" | "female" | "other") || "other",
+    phone_number: member.phone_number || "",
+    emergency_contact: member.emergency_contact || "",
+    health_info: member.health_info || "",
+    activity_level: (member.activity_level?.toLowerCase() as "beginner" | "intermediate" | "advanced") || "beginner",
+  }), [member, birthDate]);
+  
+  // Create a form key that changes when member ID changes to force form reset between edits
+  const formKey = React.useMemo(() => `member-form-${member.member_id}`, [member.member_id]);
   
   const form = useForm<MemberFormValues>({
     resolver: zodResolver(memberFormSchema),
-    defaultValues: {
-      first_name: member.first_name,
-      last_name: member.last_name,
-      birth_date: birthDate,
-      email: member.email || "",
-      gender: (member.gender?.toLowerCase() as "male" | "female" | "other") || "other",
-      phone_number: member.phone_number || "",
-      emergency_contact: member.emergency_contact || "",
-      health_info: member.health_info || "",
-      activity_level: (member.activity_level?.toLowerCase() as "beginner" | "intermediate" | "advanced") || "beginner",
-    },
-  })
-  
-  // Log form state for debugging
-  const formState = form.formState;
-  console.log("Form state:", { 
-    isDirty: formState.isDirty,
-    isSubmitting: formState.isSubmitting,
-    isValid: formState.isValid,
-    errors: formState.errors
+    defaultValues,
   });
+  
+  // Memoize the submit handler to prevent unnecessary re-renders
+  const handleSubmit = React.useCallback((values: MemberFormValues) => {
+    if (isSubmitting) {
+      console.log("FORM SUBMIT: Already submitting, ignoring duplicate submission");
+      return Promise.reject(new Error("Already submitting"));
+    }
+    
+    setIsSubmitting(true);
+    
+    return onSubmit(values)
+      .finally(() => {
+        setIsSubmitting(false);
+      });
+  }, [isSubmitting, member.member_id]);
+  
+  // Memoize the dialog onOpenChange handler
+  const handleOpenChange = React.useCallback((newOpen: boolean) => {
+    if (!newOpen && open) {
+      // Clean up when dialog is closed
+      setTimeout(() => {
+        form.reset(defaultValues); 
+      }, 100);
+    }
+    onOpenChange(newOpen);
+  }, [form, open, defaultValues, onOpenChange]);
 
   async function onSubmit(data: MemberFormValues) {
     console.log("Edit member form submitted with data:", data);
+    
+    if (isSubmitting) {
+      console.log("FORM SUBMIT: Already submitting, ignoring duplicate submission");
+      return;
+    }
+    
+    setIsSubmitting(true);
     
     try {
       console.log("FORM SUBMIT: Creating FormData object");
@@ -152,52 +183,28 @@ export function EditMemberDialog({ member, open, onOpenChange }: EditMemberDialo
       console.log("FORM SUBMIT: FormData created with entries:", Array.from(formData.entries()));
       console.log("FORM SUBMIT: Member object details:", member);
 
-      // Determine the correct ID to use
-      let memberId: number | undefined;
-
-      // More robust ID detection
-      // First check if member_id exists as a property and is a number
-      if ('member_id' in member && typeof member.member_id === 'number') {
-        memberId = member.member_id;
-        console.log("FORM SUBMIT: Using member_id from object:", memberId);
-      } 
-      // Check for member_id as a string that can be parsed to a number
-      else if ('member_id' in member && typeof member.member_id === 'string') {
-        const parsed = parseInt(member.member_id, 10);
-        if (!isNaN(parsed)) {
-          memberId = parsed;
-          console.log("FORM SUBMIT: Using parsed numeric member_id:", memberId);
-        }
-      }
-      // Otherwise, fall back to id if it's a number
-      else if ('id' in member && typeof member.id === 'number') {
-        memberId = member.id;
-        console.log("FORM SUBMIT: Using id as fallback:", memberId);
-      } 
-      // Try parsing the id as a number if it's a string
-      else if ('id' in member && typeof member.id === 'string') {
-        const parsed = parseInt(member.id, 10);
-        if (!isNaN(parsed)) {
-          memberId = parsed;
-          console.log("FORM SUBMIT: Using parsed numeric id:", memberId);
-        }
-      }
-
-      // If no valid ID was found
-      if (memberId === undefined || isNaN(memberId) || memberId <= 0) {
-        console.log("FORM SUBMIT: No valid member ID found");
-        throw new Error("Cannot update: No valid member ID available. If this is a new member, please save it first.");
+      // Use member_id directly and ensure it's a number
+      const memberId = member.member_id;
+      
+      if (typeof memberId !== 'number' || isNaN(memberId) || memberId <= 0) {
+        console.error("FORM SUBMIT: Invalid member ID:", memberId);
+        throw new Error("Invalid member ID. Cannot update this member.");
       }
       
-      // Log the exact ID being used
+      // Log the ID being used
       console.log("FORM SUBMIT: Using memberId for update:", memberId);
       
-      // Update with the correct ID
       try {
         console.log("FORM SUBMIT: Calling updateMember with ID:", memberId);
         
         // Force a short delay to ensure any previous operations are complete
         await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // Setup RLS policies first to ensure we have permission
+        await fetch('/api/setup-rls-policy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        });
         
         const result = await updateMember(memberId, formData);
         console.log("FORM SUBMIT: Server action returned:", result);
@@ -215,11 +222,13 @@ export function EditMemberDialog({ member, open, onOpenChange }: EditMemberDialo
     } catch (error) {
       console.error("FORM SUBMIT: Error in form submission:", error);
       throw error;
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-[600px] max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Edit Member</DialogTitle>
@@ -228,61 +237,58 @@ export function EditMemberDialog({ member, open, onOpenChange }: EditMemberDialo
           </DialogDescription>
         </DialogHeader>
         
-        <Form {...form}>
+        <Form {...form} key={formKey}>
           <form 
             onSubmit={(e) => {
               // Prevent the default form submission
               e.preventDefault();
               
+              if (isSubmitting) {
+                console.log("FORM SUBMIT: Already submitting, ignoring duplicate submission");
+                return;
+              }
+              
               // Get the form values directly like we do in direct submit
               const values = form.getValues();
               console.log("FORM SUBMIT: Form values:", values);
               
-              // Call onSubmit directly with the values, matching the direct submit approach
-              try {
-                // Show pending toast
-                const toastId = toast.loading("Updating member...");
-                
-                onSubmit(values)
-                  .then((updatedMember) => {
-                    console.log("FORM SUBMIT: Member updated successfully:", updatedMember);
-                    toast.dismiss(toastId);
-                    toast.success("Member updated successfully");
-                    onOpenChange(false);
+              // Set submitting state first
+              setIsSubmitting(true);
+              
+              // Show pending toast
+              const toastId = toast.loading(`Updating ${values.first_name} ${values.last_name}...`);
+              
+              // Call onSubmit directly with the values
+              handleSubmit(values)
+                .then((updatedMember) => {
+                  console.log("FORM SUBMIT: Member updated successfully:", updatedMember);
+                  toast.dismiss(toastId);
+                  toast.success(`${values.first_name} ${values.last_name} updated successfully`);
+                  
+                  // Close the dialog first
+                  onOpenChange(false);
+                  
+                  // Refresh the router after a slight delay
+                  setTimeout(() => {
                     router.refresh();
-                  })
-                  .catch(error => {
-                    console.error("FORM SUBMIT: Error in onSubmit handler:", error);
-                    toast.dismiss(toastId);
-                    
-                    // Check for RLS-related errors
-                    const errorMessage = error.message || "Failed to update member";
-                    if (errorMessage.includes("RLS policy") || errorMessage.includes("Permission denied") || errorMessage.includes("PGRST100")) {
-                      // This is an RLS-related error
-                      toast.error("Permission denied due to RLS policies");
-                      
-                      // Show a more detailed error with guidance
-                      setTimeout(() => {
-                        alert(
-                          "Row Level Security (RLS) Policy Error\n\n" +
-                          "You don't have permission to update this member record. This is likely because:\n\n" +
-                          "1. You are not authenticated, or\n" +
-                          "2. The necessary RLS policies are not set up\n\n" +
-                          "Recommended actions:\n" +
-                          "• Make sure you are logged in\n" +
-                          "• Contact your administrator to set up proper RLS policies\n\n" +
-                          "Technical details:\n" +
-                          errorMessage
-                        );
-                      }, 500);
-                    } else {
-                      toast.error(errorMessage);
-                    }
-                  });
-              } catch (error) {
-                console.error("FORM SUBMIT: Unexpected error during form submission:", error);
-                toast.error("Unexpected error occurred");
-              }
+                  }, 100);
+                })
+                .catch(error => {
+                  console.error("FORM SUBMIT: Error in onSubmit handler:", error);
+                  toast.dismiss(toastId);
+                  
+                  // Check for RLS-related errors
+                  const errorMessage = error.message || "Failed to update member";
+                  if (errorMessage.includes("RLS policy") || errorMessage.includes("Permission denied") || errorMessage.includes("PGRST100")) {
+                    // This is an RLS-related error
+                    toast.error("Permission denied: RLS policy issue. Click 'Setup RLS Policy' button first.");
+                  } else {
+                    toast.error(`Update failed: ${errorMessage}`);
+                  }
+                })
+                .finally(() => {
+                  setIsSubmitting(false);
+                });
             }} 
             className="space-y-6"
           >
@@ -476,8 +482,8 @@ export function EditMemberDialog({ member, open, onOpenChange }: EditMemberDialo
               <Button variant="outline" type="button" onClick={() => onOpenChange(false)}>
                 Cancel
               </Button>
-              <Button type="submit">
-                Save Changes
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? "Saving..." : "Save Changes"}
               </Button>
             </DialogFooter>
           </form>

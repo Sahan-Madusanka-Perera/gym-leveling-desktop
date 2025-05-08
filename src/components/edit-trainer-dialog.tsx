@@ -168,13 +168,13 @@ export function EditTrainerDialog({ trainer, open, onOpenChange }: EditTrainerDi
               // Call onSubmit directly with the values, matching the direct submit approach
               try {
                 // Show pending toast
-                const toastId = toast.loading("Updating trainer...");
+                const toastId = toast.loading(`Updating ${values.name}...`);
                 
                 onSubmit(values)
                   .then((updatedTrainer) => {
                     console.log("FORM SUBMIT: Trainer updated successfully:", updatedTrainer);
                     toast.dismiss(toastId);
-                    toast.success("Trainer updated successfully");
+                    toast.success(`${values.name} updated successfully`);
                     onOpenChange(false);
                     router.refresh();
                   })
@@ -186,7 +186,7 @@ export function EditTrainerDialog({ trainer, open, onOpenChange }: EditTrainerDi
                     const errorMessage = error.message || "Failed to update trainer";
                     if (errorMessage.includes("RLS policy") || errorMessage.includes("Permission denied") || errorMessage.includes("PGRST100")) {
                       // This is an RLS-related error
-                      toast.error("Permission denied due to RLS policies");
+                      toast.error("Permission denied: RLS policy issue");
                       
                       // Show a more detailed error with guidance
                       setTimeout(() => {
@@ -203,7 +203,7 @@ export function EditTrainerDialog({ trainer, open, onOpenChange }: EditTrainerDi
                         );
                       }, 500);
                     } else {
-                      toast.error(errorMessage);
+                      toast.error(`Update failed: ${errorMessage}`);
                     }
                   });
               } catch (error) {

@@ -29,42 +29,97 @@ import { Input } from "@/components/ui/input"
 import { addTrainer } from "@/app/actions/trainer"
 import { type Trainer, trainerSchema } from "@/types/trainer"
 
-type TrainerFormData = Omit<Trainer, "id">
+type TrainerFormData = Omit<Trainer, "id" | "trainer_id">
 
 export function AddTrainerDialog() {
   const router = useRouter()
   const [open, setOpen] = React.useState(false)
+  const [isSubmitting, setIsSubmitting] = React.useState(false)
+  
+  // Define default values with useMemo to prevent unnecessary re-renders
+  const defaultValues = React.useMemo(() => ({
+    name: "",
+    specialization: "",
+    contact: "",
+  }), []);
+  
   const form = useForm<TrainerFormData>({
-    resolver: zodResolver(trainerSchema.omit({ id: true })),
-    defaultValues: {
-      name: "",
-      specialization: "",
-      contact: "",
-    },
+    resolver: zodResolver(trainerSchema.omit({ id: true, trainer_id: true })),
+    defaultValues,
   })
+  
+  // Memoize the dialog open change handler
+  const handleOpenChange = React.useCallback((newOpen: boolean) => {
+    // When closing the dialog, reset the form with a delay to avoid React update loops
+    if (!newOpen && open) {
+      setOpen(false);
+      setTimeout(() => {
+        form.reset(defaultValues);
+      }, 100);
+    } else {
+      setOpen(newOpen);
+    }
+  }, [open, form, defaultValues]);
 
-  async function onSubmit(data: TrainerFormData) {
+  // Memoize the submit handler
+  const handleSubmit = React.useCallback(async (data: TrainerFormData) => {
+    if (isSubmitting) {
+      console.log("Already submitting, ignoring duplicate submission");
+      return;
+    }
+    
+    setIsSubmitting(true);
+    const toastId = toast.loading(`Adding new trainer: ${data.name}...`);
+    
     try {
       const formData = new FormData()
       formData.append("name", data.name)
       formData.append("specialization", data.specialization || "")
       formData.append("contact", data.contact || "")
-
+      
+      // Setup RLS policies first to ensure we have permission
+      try {
+        await fetch('/api/setup-rls-policy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        });
+      } catch (rlsError) {
+        console.error("RLS setup error:", rlsError);
+        // Continue anyway, as the addTrainer function will try to set up RLS too
+      }
+      
       await addTrainer(formData)
-      toast.success("Trainer added successfully")
-      form.reset()
-      setOpen(false)
-      router.refresh()
+      
+      toast.dismiss(toastId);
+      toast.success(`${data.name} added successfully!`);
+      
+      // Close dialog first
+      setOpen(false);
+      
+      // Then refresh the page after a slight delay
+      setTimeout(() => {
+        router.refresh();
+      }, 100);
     } catch (error) {
-      toast.error("Failed to add trainer")
+      toast.dismiss(toastId);
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      
+      if (errorMessage.includes("RLS policy") || errorMessage.includes("Permission denied")) {
+        toast.error(`Failed to add trainer: RLS policy issue. Please click 'Setup RLS Policy' button first.`);
+      } else {
+        toast.error(`Failed to add trainer: ${errorMessage}`);
+      }
+      console.error("Add trainer error:", error);
+    } finally {
+      setIsSubmitting(false);
     }
-  }
+  }, [isSubmitting, router]);
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         <Button variant="outline" size="sm">
-          <PlusIcon />
+          <PlusIcon className="mr-2 h-4 w-4" />
           <span className="hidden lg:inline">Add Trainer</span>
         </Button>
       </DialogTrigger>
@@ -76,7 +131,7 @@ export function AddTrainerDialog() {
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <FormField
                 control={form.control}
@@ -124,7 +179,9 @@ export function AddTrainerDialog() {
               <Button variant="outline" type="button" onClick={() => setOpen(false)}>
                 Cancel
               </Button>
-              <Button type="submit">Add Trainer</Button>
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? "Adding..." : "Add Trainer"}
+              </Button>
             </DialogFooter>
           </form>
         </Form>

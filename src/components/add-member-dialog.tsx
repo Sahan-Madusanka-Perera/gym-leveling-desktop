@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { CalendarIcon } from "lucide-react"
+import { CalendarIcon, PlusIcon } from "lucide-react"
 import { useForm } from "react-hook-form"
 import { z } from "zod"
 import { format } from "date-fns"
@@ -81,10 +81,11 @@ type MemberFormValues = z.infer<typeof memberFormSchema>
 
 export function AddMemberDialog() {
   const [open, setOpen] = React.useState(false)
+  const [isSubmitting, setIsSubmitting] = React.useState(false)
   const router = useRouter()
   
-  // Define default values
-  const defaultValues: Partial<MemberFormValues> = {
+  // Define default values - memoize to prevent unnecessary re-renders
+  const defaultValues = React.useMemo<Partial<MemberFormValues>>(() => ({
     first_name: "",
     last_name: "",
     email: "",
@@ -94,14 +95,23 @@ export function AddMemberDialog() {
     subscription_status: "active",
     activity_level: "beginner",
     gender: "other"
-  }
+  }), []);
 
   const form = useForm<MemberFormValues>({
     resolver: zodResolver(memberFormSchema),
     defaultValues,
   })
 
-  async function onSubmit(data: MemberFormValues) {
+  // Memoize the form submission function
+  const handleSubmit = React.useCallback(async (data: MemberFormValues) => {
+    if (isSubmitting) {
+      console.log("Already submitting, ignoring duplicate submission");
+      return;
+    }
+    
+    setIsSubmitting(true);
+    const toastId = toast.loading(`Adding new member: ${data.first_name} ${data.last_name}...`);
+    
     try {
       const formData = new FormData()
       formData.append("firstName", data.first_name)
@@ -113,20 +123,60 @@ export function AddMemberDialog() {
       formData.append("emergencyContact", data.emergency_contact || "")
       formData.append("healthInfo", data.health_info || "")
       formData.append("activityLevel", data.activity_level)
-
+      
+      // Setup RLS policies first to ensure we have permission
+      try {
+        await fetch('/api/setup-rls-policy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        });
+      } catch (rlsError) {
+        console.error("RLS setup error:", rlsError);
+        // Continue anyway, as the addMember function will try to set up RLS too
+      }
+      
       await addMember(formData)
       
-      toast.success("Member added successfully!")
-      setOpen(false)
-      form.reset(defaultValues)
-      router.refresh() // Refresh the page to show new member
+      toast.dismiss(toastId);
+      toast.success(`${data.first_name} ${data.last_name} added successfully!`);
+      
+      // Close dialog first
+      setOpen(false);
+      
+      // Then refresh the page after a slight delay
+      setTimeout(() => {
+        router.refresh();
+      }, 100);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to add member")
+      toast.dismiss(toastId);
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      
+      if (errorMessage.includes("RLS policy") || errorMessage.includes("Permission denied")) {
+        toast.error(`Failed to add member: RLS policy issue. Please click 'Setup RLS Policy' button first.`);
+      } else {
+        toast.error(`Failed to add member: ${errorMessage}`);
+      }
+      console.error("Add member error:", error);
+    } finally {
+      setIsSubmitting(false);
     }
-  }
+  }, [isSubmitting, router]);
+  
+  // Memoize the dialog open change handler
+  const handleOpenChange = React.useCallback((newOpen: boolean) => {
+    // When closing the dialog, reset the form with a delay to avoid React update loops
+    if (!newOpen && open) {
+      setOpen(false);
+      setTimeout(() => {
+        form.reset(defaultValues);
+      }, 100);
+    } else {
+      setOpen(newOpen);
+    }
+  }, [open, form, defaultValues]);
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         <Button variant="outline" size="sm">
           <PlusIcon />
@@ -141,7 +191,7 @@ export function AddMemberDialog() {
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <FormField
                 control={form.control}
@@ -355,7 +405,9 @@ export function AddMemberDialog() {
               <Button variant="outline" type="button" onClick={() => setOpen(false)}>
                 Cancel
               </Button>
-              <Button type="submit">Add Member</Button>
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? "Adding..." : "Add Member"}
+              </Button>
             </DialogFooter>
           </form>
         </Form>
@@ -363,6 +415,3 @@ export function AddMemberDialog() {
     </Dialog>
   )
 }
-
-// Don't forget to import PlusIcon
-import { PlusIcon } from "lucide-react"

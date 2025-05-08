@@ -148,6 +148,39 @@ function DraggableRow({ row }: { row: Row<Member> }) {
   )
 }
 
+// Function to set up RLS policies
+async function setupRlsPolicies() {
+  try {
+    const toastId = toast.loading("Setting up RLS policies...");
+    
+    const response = await fetch('/api/setup-rls-policy', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      toast.dismiss(toastId);
+      toast.error(errorData.message || 'Failed to set up RLS policies');
+      throw new Error(errorData.message || 'Failed to set up RLS policies');
+    }
+    
+    const result = await response.json();
+    toast.dismiss(toastId);
+    toast.success("RLS policies set up successfully", {
+      description: "You can now add, edit, and delete members"
+    });
+    
+    // Return the result
+    return result;
+  } catch (error) {
+    console.error('Error setting up RLS policies:', error);
+    throw error;
+  }
+}
+
 export function DataTable({
   data: initialData,
 }: {
@@ -211,17 +244,25 @@ export function DataTable({
   const handleTrainerChange = async (memberId: number, trainerId: string) => {
     try {
       // Show loading state
-      const toastId = toast.loading("Updating trainer assignment...")
+      const toastId = toast.loading("Updating trainer assignment...");
       
       // Convert trainerId to number or null
-      const newTrainerId = trainerId === "null" ? null : parseInt(trainerId, 10)
+      const newTrainerId = trainerId === "null" ? null : parseInt(trainerId, 10);
       
       // Call the server action to update the assignment
-      await assignTrainer(memberId, newTrainerId)
+      await assignTrainer(memberId, newTrainerId);
+      
+      // Get the member and trainer names for the success message
+      const member = data.find(m => m.id === memberId);
+      const trainerName = newTrainerId === null 
+        ? "None" 
+        : trainers.find(t => t.trainer_id === newTrainerId)?.name || "Unknown";
       
       // Success notification
-      toast.dismiss(toastId)
-      toast.success("Trainer assignment updated")
+      toast.dismiss(toastId);
+      toast.success(newTrainerId === null
+        ? `Removed trainer from ${member?.name}`
+        : `Assigned ${trainerName} to ${member?.name}`);
       
       // Update local data instead of refreshing the entire page
       setData(prevData => 
@@ -229,7 +270,7 @@ export function DataTable({
           if (member.id === memberId) {
             const assignedTrainer = newTrainerId === null ? 
               "Assign trainer" : 
-              trainers.find(t => t.trainer_id === newTrainerId)?.name || "Assign trainer"
+              trainers.find(t => t.trainer_id === newTrainerId)?.name || "Assign trainer";
             
             return {
               ...member,
@@ -239,10 +280,10 @@ export function DataTable({
           }
           return member
         })
-      )
+      );
     } catch (error) {
-      console.error("Error updating trainer assignment:", error)
-      toast.error(error instanceof Error ? error.message : "Failed to update trainer assignment")
+      console.error("Error updating trainer assignment:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to update trainer assignment");
     }
   }
 
@@ -381,6 +422,9 @@ export function DataTable({
         // Function to handle edit action
         const onEdit = async () => {
           try {
+            // Don't open a dialog that's already open
+            if (editDialogOpen) return;
+            
             const supabase = await import("@/lib/supabase/client").then(m => m.createClient());
             
             // Get the original member data from Supabase
@@ -422,17 +466,18 @@ export function DataTable({
               <DropdownMenuItem
                 onClick={() => {
                   // Delete the member
+                  const memberName = member.name;
                   toast.promise(
                     deleteMembers([member.id]).then(() => {
                       const newData = data.filter(row => row.id !== member.id);
                       setData(newData);
                       router.refresh();
-                      return "Member deleted successfully";
+                      return `${memberName} deleted successfully`;
                     }),
                     {
-                      loading: "Deleting member...",
+                      loading: `Deleting ${memberName}...`,
                       success: (message) => message,
-                      error: "Failed to delete member",
+                      error: "Failed to delete member"
                     }
                   );
                 }}
@@ -486,9 +531,14 @@ export function DataTable({
     const selectedRows = Object.keys(rowSelection).map(Number)
     
     if (selectedRows.length === 0) {
-      toast.error("No rows selected")
+      toast.error("No rows selected", {
+        description: "Please select at least one member to delete",
+        icon: "ℹ️"
+      })
       return
     }
+    
+    const count = selectedRows.length;
     
     toast.promise(
       deleteMembers(selectedRows).then(() => {
@@ -496,12 +546,12 @@ export function DataTable({
         setData(newData)
         setRowSelection({})
         router.refresh() // Refresh the page to reflect the changes
-        return `${selectedRows.length} row(s) deleted successfully`
+        return `${count} ${count === 1 ? 'member' : 'members'} deleted successfully`
       }),
       {
-        loading: "Deleting selected rows...",
+        loading: `Deleting ${count} ${count === 1 ? 'member' : 'members'}...`,
         success: (message) => message,
-        error: "Failed to delete rows",
+        error: "Failed to delete members"
       }
     )
   }
@@ -553,6 +603,27 @@ export function DataTable({
               <span className="hidden lg:inline">Delete Selected</span>
             </Button>
             <AddMemberDialog />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                toast.promise(
+                  setupRlsPolicies().then(() => {
+                    // Refresh the page to reflect the policy changes
+                    router.refresh();
+                    return "RLS policies are now ready!";
+                  }),
+                  {
+                    loading: "Setting up RLS policies...",
+                    success: (data) => data,
+                    error: (err) => `Failed: ${err.message}`
+                  }
+                );
+              }}
+            >
+              <span className="hidden lg:inline">Setup RLS Policy</span>
+              <span className="lg:hidden">RLS</span>
+            </Button>
           </div>
           <div className="flex items-center gap-2">
             <Input
@@ -698,15 +769,22 @@ export function DataTable({
       </div>
       
       {/* Edit Member Dialog */}
-      {selectedMember && (
+      {selectedMember && editDialogOpen && (
         <EditMemberDialog
           member={selectedMember}
           open={editDialogOpen}
           onOpenChange={(open) => {
-            setEditDialogOpen(open);
             if (!open) {
-              // Refresh the data when dialog is closed
-              router.refresh();
+              // First close the dialog
+              setEditDialogOpen(false);
+              // Then clear the selected member with a slight delay to avoid state conflicts
+              setTimeout(() => {
+                setSelectedMember(null);
+                // Refresh data after a dialog close
+                router.refresh();
+              }, 300);
+            } else {
+              setEditDialogOpen(open);
             }
           }}
         />
