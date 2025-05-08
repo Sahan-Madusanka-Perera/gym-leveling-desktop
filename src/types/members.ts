@@ -11,6 +11,7 @@ export const memberSchema = z.object({
   healthInfo: z.string().nullable(),
   activityLevel: z.string(),
   trainer: z.string().default("Assign trainer"),
+  trainer_id: z.number().nullable().optional(),
 })
 
 export type Member = z.infer<typeof memberSchema>  
