@@ -56,12 +56,12 @@ const data = {
     },
     {
       title: "Exercises",
-      url: "#",
+      url: "/exercises",
       icon: Activity,
     },
     {
       title: "Sessions",
-      url: "#",
+      url: "/sessions",
       icon: ClipboardList,
     },
   ],
