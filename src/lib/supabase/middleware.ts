@@ -12,7 +12,7 @@ export async function middleware(request: NextRequest) {
   const { data: { user }, error } = await supabase.auth.getUser();
 
   // If there's no user or session is invalid, redirect to login page
-  const protectedRoutes = ['/dashboard']; // List protected routes here
+  const protectedRoutes = ['/dashboard', '/sessions', '/members', '/analytics', '/trainers']; // List protected routes here
   const isProtectedRoute = protectedRoutes.some((route) => request.nextUrl.pathname.startsWith(route));
 
   if (!user && isProtectedRoute) {

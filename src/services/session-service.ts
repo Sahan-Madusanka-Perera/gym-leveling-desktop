@@ -193,12 +193,14 @@ export async function filterSessions({
   type,
   instructor,
   intensity,
-  search
+  search,
+  day_of_week
 }: {
   type?: string;
   instructor?: number;
   intensity?: 'Low' | 'Medium' | 'High';
   search?: string;
+  day_of_week?: number;
 }): Promise<Session[]> {
   let query = supabase
     .from('sessions')
@@ -221,6 +223,10 @@ export async function filterSessions({
 
   if (intensity) {
     query = query.eq('intensity', intensity);
+  }
+
+  if (day_of_week !== undefined) {
+    query = query.eq('day_of_week', day_of_week);
   }
 
   if (search) {

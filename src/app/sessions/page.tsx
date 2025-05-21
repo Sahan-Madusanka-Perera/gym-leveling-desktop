@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { Session, timeSlots } from "./types";
+import { Session, timeSlots, daysOfWeek, DaySchedule, SessionSchedule } from "./types";
 import { 
   getAllSessions,
   getUniqueTypes,
@@ -28,6 +28,8 @@ import { Textarea } from "@/components/ui/textarea";
 import Image from "next/image";
 import Link from "next/link";
 import { CalendarDays, Clock, Grid, LayoutList, Users, Plus, Image as ImageIcon, Trash, Save, ListChecks, Info } from "lucide-react";
+import moment from 'moment';
+import { toast } from "sonner";
 
 // Temporary mock data for weekSchedule until we implement it in Supabase
 const weekSchedule = [
@@ -104,6 +106,9 @@ function AddSessionDialog({ onSessionAdded }: { onSessionAdded: () => void }) {
     capacity: 15,
     equipment: [''],
     benefits: [''],
+    day_of_week: null as number | null,
+    start_time: '' as string | null,
+    end_time: '' as string | null,
   });
 
   useEffect(() => {
@@ -258,6 +263,9 @@ function AddSessionDialog({ onSessionAdded }: { onSessionAdded: () => void }) {
       capacity: 15,
       equipment: [''],
       benefits: [''],
+      day_of_week: null,
+      start_time: '',
+      end_time: '',
     });
     setImageFile(null);
     setImagePreview(null);
@@ -270,6 +278,9 @@ function AddSessionDialog({ onSessionAdded }: { onSessionAdded: () => void }) {
     
     try {
       let imagePath = '/images/default-session.jpg';
+      
+      // Show loading toast
+      const toastId = toast.loading("Creating new session...");
       
       // Handle image upload
       if (imageFile) {
@@ -297,6 +308,12 @@ function AddSessionDialog({ onSessionAdded }: { onSessionAdded: () => void }) {
         instructor_id: Number(formData.instructor_id)
       });
       
+      // Dismiss loading toast and show success
+      toast.dismiss(toastId);
+      toast.success("Session created successfully", {
+        description: `${formData.title} has been added to the schedule`
+      });
+      
       // Reset form and close dialog
       resetForm();
       setOpen(false);
@@ -304,6 +321,10 @@ function AddSessionDialog({ onSessionAdded }: { onSessionAdded: () => void }) {
       // Notify parent to refresh data
       onSessionAdded();
     } catch (error) {
+      // Show error toast
+      toast.error("Failed to create session", {
+        description: error instanceof Error ? error.message : "An unexpected error occurred"
+      });
       console.error('Failed to create session:', error);
     } finally {
       setIsLoading(false);
@@ -543,6 +564,61 @@ function AddSessionDialog({ onSessionAdded }: { onSessionAdded: () => void }) {
                 ))}
               </div>
               
+              <div className="space-y-4 mt-6 pt-6 border-t">
+                <Label className="text-base font-medium">Session Schedule</Label>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="day_of_week">Day of Week</Label>
+                  <Select
+                    value={formData.day_of_week !== null ? formData.day_of_week.toString() : "none"}
+                    onValueChange={(value) => 
+                      handleSelectChange('day_of_week', value === "none" ? null : parseInt(value))
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select day of week (optional)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No specific day</SelectItem>
+                      {daysOfWeek.map(day => (
+                        <SelectItem key={day.id} value={day.id.toString()}>
+                          {day.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="start_time">Start Time</Label>
+                    <Input
+                      id="start_time"
+                      name="start_time"
+                      type="time"
+                      value={formData.start_time || ''}
+                      onChange={handleChange}
+                      placeholder="e.g. 09:00"
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="end_time">End Time</Label>
+                    <Input
+                      id="end_time"
+                      name="end_time"
+                      type="time"
+                      value={formData.end_time || ''}
+                      onChange={handleChange}
+                      placeholder="e.g. 10:00"
+                    />
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Scheduling is optional. If you don't set a day or time, the session can be scheduled flexibly.
+                </p>
+              </div>
+              
               <div className="flex justify-between">
                 <Button type="button" variant="outline" onClick={() => setActiveTab('info')}>
                   Previous
@@ -615,6 +691,124 @@ function AddSessionDialog({ onSessionAdded }: { onSessionAdded: () => void }) {
   );
 }
 
+// Add a helper function to format time and convert the day of week number to day name
+function formatSchedule(dayOfWeek: number | null | undefined, startTime: string | null | undefined, endTime: string | null | undefined) {
+  const dayName = dayOfWeek !== null && dayOfWeek !== undefined ? daysOfWeek.find(day => day.id === dayOfWeek)?.name : null;
+  
+  // Format time from "HH:MM:SS" to "HH:MM AM/PM"
+  const formatTimeString = (timeStr: string | null | undefined) => {
+    if (!timeStr) return null;
+    
+    // If it has seconds, remove them
+    if (timeStr.includes(':')) {
+      const parts = timeStr.split(':');
+      if (parts.length === 3) {
+        timeStr = `${parts[0]}:${parts[1]}`;
+      }
+    }
+    
+    // Try to parse the time
+    try {
+      const timeParts = timeStr.split(':');
+      if (timeParts.length < 2) return timeStr;
+      
+      let hours = parseInt(timeParts[0], 10);
+      const minutes = timeParts[1];
+      const ampm = hours >= 12 ? 'PM' : 'AM';
+      
+      hours = hours % 12;
+      hours = hours ? hours : 12; // Convert 0 to 12
+      
+      return `${hours}:${minutes} ${ampm}`;
+    } catch (e) {
+      return timeStr;
+    }
+  };
+  
+  const formattedStartTime = formatTimeString(startTime);
+  const formattedEndTime = formatTimeString(endTime);
+  
+  if (dayName && formattedStartTime && formattedEndTime) {
+    return `${dayName}s, ${formattedStartTime} - ${formattedEndTime}`;
+  } else if (dayName) {
+    return `${dayName}s`;
+  } else if (formattedStartTime && formattedEndTime) {
+    return `${formattedStartTime} - ${formattedEndTime}`;
+  }
+  
+  return null;
+}
+
+// Add a function to map sessions to the weekly schedule based on their day_of_week and time
+function mapSessionsToSchedule(sessions: Session[]): DaySchedule[] {
+  // Create base weekly schedule
+  const schedule: DaySchedule[] = daysOfWeek.map(day => ({
+    day: day.name,
+    sessions: [] as SessionSchedule[] // Explicitly typed
+  }));
+  
+  // For each session that has a day_of_week and times
+  sessions.forEach(session => {
+    if (session.day_of_week !== null && session.day_of_week !== undefined && 
+        session.start_time && session.day_of_week >= 0 && session.day_of_week <= 6) {
+      
+      // Determine the time slot based on start time
+      let timeSlotName: string = 'Morning';
+      
+      if (session.start_time) {
+        try {
+          const timeStr = session.start_time;
+          const hour = parseInt(timeStr.split(':')[0], 10);
+          
+          if (hour >= 5 && hour < 12) {
+            timeSlotName = 'Morning';
+          } else if (hour >= 12 && hour < 17) {
+            timeSlotName = 'Afternoon';
+          } else if (hour >= 17 && hour < 20) {
+            timeSlotName = 'Evening';
+          } else {
+            timeSlotName = 'Night';
+          }
+        } catch(e) {
+          console.error('Error parsing time:', e);
+        }
+      }
+      
+      // Add to the appropriate day's sessions
+      const scheduleItem: SessionSchedule = {
+        time: timeSlotName,
+        title: session.title,
+        color: getSessionColor(session.type),
+        image: session.image,
+        sessionId: session.id
+      };
+      
+      schedule[session.day_of_week].sessions.push(scheduleItem);
+    }
+  });
+  
+  return schedule;
+}
+
+// Helper function to get a color for session type
+function getSessionColor(type: string): string {
+  switch(type) {
+    case 'Yoga': return 'bg-blue-100';
+    case 'Cardio': return 'bg-red-100';
+    case 'Strength': return 'bg-purple-100';
+    case 'HIIT': return 'bg-orange-100';
+    case 'Meditation': return 'bg-violet-100';
+    case 'Dance': return 'bg-indigo-100';
+    case 'Pilates': return 'bg-green-100';
+    case 'Aerobics': return 'bg-yellow-100';
+    case 'Functional': return 'bg-teal-100';
+    case 'Recovery': return 'bg-pink-100';
+    case 'Nutrition': return 'bg-gray-100';
+    case 'Personal Training': return 'bg-amber-100';
+    default: return 'bg-gray-100';
+  }
+}
+
 export default function SessionsPage() {
   const [allSessions, setAllSessions] = useState<Session[]>([]);
   const [filteredSessions, setFilteredSessions] = useState<Session[]>([]);
@@ -623,11 +817,13 @@ export default function SessionsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedView, setSelectedView] = useState<'grid' | 'list'>('grid');
   const [activeTab, setActiveTab] = useState<string>("all");
+  const [scheduledSessions, setScheduledSessions] = useState<DaySchedule[]>([]);
 
   // Filter states
   const [selectedType, setSelectedType] = useState<string | null>(null);
   const [selectedInstructor, setSelectedInstructor] = useState<number | null>(null);
   const [selectedIntensity, setSelectedIntensity] = useState<'Low' | 'Medium' | 'High' | null>(null);
+  const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 8;
@@ -675,7 +871,8 @@ export default function SessionsPage() {
           type: selectedType === "all_types" ? undefined : selectedType || undefined,
           instructor: selectedInstructor === null ? undefined : selectedInstructor,
           intensity: intensityFilter,
-          search: searchTerm || undefined
+          search: searchTerm || undefined,
+          day_of_week: selectedDay === null ? undefined : selectedDay
         });
         setFilteredSessions(filtered);
         setCurrentPage(1); // Reset to first page when filters change
@@ -687,12 +884,13 @@ export default function SessionsPage() {
     if (!isLoading) {
       applyFilters();
     }
-  }, [selectedType, selectedInstructor, selectedIntensity, searchTerm, isLoading, instructors]);
+  }, [selectedType, selectedInstructor, selectedIntensity, selectedDay, searchTerm, isLoading, instructors]);
 
   const clearFilters = () => {
     setSelectedType(null);
     setSelectedInstructor(null);
     setSelectedIntensity(null);
+    setSelectedDay(null);
     setSearchTerm("");
   };
 
@@ -717,6 +915,7 @@ export default function SessionsPage() {
       setSelectedType(null);
       setSelectedInstructor(null);
       setSelectedIntensity(null);
+      setSelectedDay(null);
       
       // We'll use the search term to filter by time of day
       const timeSlot = value.charAt(0).toUpperCase() + value.slice(1);
@@ -771,6 +970,14 @@ export default function SessionsPage() {
     }
   };
 
+  // Use the allSessions to generate the weekly schedule
+  useEffect(() => {
+    if (allSessions.length > 0) {
+      const schedule = mapSessionsToSchedule(allSessions);
+      setScheduledSessions(schedule);
+    }
+  }, [allSessions]);
+
   return (
     <div className="w-full px-4 lg:px-0">
       <div className="flex justify-between items-center mb-4">
@@ -800,7 +1007,8 @@ export default function SessionsPage() {
                 <table className="w-full border-collapse">
                   <thead>
                     <tr>
-                      {weekSchedule.map((day, index) => (
+                      <th className="p-2 text-left font-medium text-muted-foreground">&nbsp;</th>
+                      {scheduledSessions.map((day, index) => (
                         <th key={index} className="p-2 text-center border-b">
                           {day.day}
                         </th>
@@ -813,7 +1021,7 @@ export default function SessionsPage() {
                         <th className="p-2 text-left font-medium text-muted-foreground">
                           {timeSlot.name}
                         </th>
-                        {weekSchedule.map((day, dayIndex) => {
+                        {scheduledSessions.map((day, dayIndex) => {
                           const sessionsInSlot = day.sessions.filter(
                             session => session.time === timeSlot.name
                           );
@@ -821,7 +1029,7 @@ export default function SessionsPage() {
                           return (
                             <td key={dayIndex} className="p-1 border">
                               <div className="grid grid-cols-1 gap-1">
-                                {sessionsInSlot.map((session, i) => (
+                                {sessionsInSlot.map((session: SessionSchedule, i: number) => (
                                   <Link 
                                     href={`/sessions/${session.sessionId}`} 
                                     key={`${dayIndex}-${slotIndex}-${i}`}
@@ -877,6 +1085,8 @@ export default function SessionsPage() {
             setSelectedInstructor={setSelectedInstructor}
             selectedIntensity={selectedIntensity}
             setSelectedIntensity={setSelectedIntensity}
+            selectedDay={selectedDay}
+            setSelectedDay={setSelectedDay}
             searchTerm={searchTerm}
             setSearchTerm={setSearchTerm}
             clearFilters={clearFilters}
@@ -904,6 +1114,8 @@ export default function SessionsPage() {
               setSelectedInstructor={setSelectedInstructor}
               selectedIntensity={selectedIntensity}
               setSelectedIntensity={setSelectedIntensity}
+              selectedDay={selectedDay}
+              setSelectedDay={setSelectedDay}
               searchTerm={searchTerm}
               setSearchTerm={setSearchTerm}
               clearFilters={clearFilters}
@@ -935,6 +1147,8 @@ function Sessions({
   setSelectedInstructor,
   selectedIntensity,
   setSelectedIntensity,
+  selectedDay,
+  setSelectedDay,
   searchTerm,
   setSearchTerm,
   clearFilters,
@@ -957,6 +1171,8 @@ function Sessions({
   setSelectedInstructor: (instructor: number | null) => void;
   selectedIntensity: 'Low' | 'Medium' | 'High' | null;
   setSelectedIntensity: (intensity: 'Low' | 'Medium' | 'High' | null) => void;
+  selectedDay: number | null;
+  setSelectedDay: (day: number | null) => void;
   searchTerm: string;
   setSearchTerm: (term: string) => void;
   clearFilters: () => void;
@@ -972,8 +1188,8 @@ function Sessions({
       ) : (
         <>
           {/* Filters Section */}
-          <div className="bg-secondary/10 rounded-lg p-4 mb-8">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+          <div className="bg-secondary/10 rounded-lg p-4 mb-8 px-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium">Search</label>
                 <Input
@@ -1054,7 +1270,33 @@ function Sessions({
                 </Select>
               </div>
 
-              <div className="flex items-end">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Day of Week</label>
+                <Select 
+                  value={selectedDay !== null ? selectedDay.toString() : "all_days"}
+                  onValueChange={(value) => {
+                    if (value === "all_days") {
+                      setSelectedDay(null);
+                    } else {
+                      setSelectedDay(parseInt(value));
+                    }
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select day" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all_days">All Days</SelectItem>
+                    {daysOfWeek.map((day) => (
+                      <SelectItem key={day.id} value={day.id.toString()}>
+                        {day.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="space-y-2 flex items-end">
                 <Button 
                   onClick={clearFilters} 
                   variant="outline" 
@@ -1067,7 +1309,7 @@ function Sessions({
           </div>
 
           {/* View Toggle */}
-          <div className="flex justify-between items-center mb-4">
+          <div className="flex justify-between items-center mb-4 px-4">
             <p className="text-sm">
               Showing {filteredSessions.length} sessions
               {timeSlotName ? ` (${timeSlotName})` : ''}
@@ -1094,7 +1336,7 @@ function Sessions({
 
           {/* No Results */}
           {filteredSessions.length === 0 && (
-            <div className="text-center py-16 border border-dashed rounded-lg">
+            <div className="text-center py-16 border border-dashed rounded-lg px-4">
               <p className="text-lg font-medium mb-2">No sessions found</p>
               <p className="text-muted-foreground">Try changing your filters or search term</p>
             </div>
@@ -1102,7 +1344,7 @@ function Sessions({
 
           {/* Grid View */}
           {selectedView === 'grid' && filteredSessions.length > 0 && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 px-4">
               {sessions.map((session) => (
                 <Card key={session.id} className="overflow-hidden h-full flex flex-col">
                   <div className="aspect-square relative overflow-hidden bg-secondary/20">
@@ -1135,6 +1377,12 @@ function Sessions({
                       <Users className="h-4 w-4" />
                       <span>Capacity: {session.capacity}</span>
                     </div>
+                    {formatSchedule(session.day_of_week, session.start_time, session.end_time) && (
+                      <div className="flex items-center gap-1 mb-2 text-sm text-primary">
+                        <CalendarDays className="h-4 w-4" />
+                        <span>{formatSchedule(session.day_of_week, session.start_time, session.end_time)}</span>
+                      </div>
+                    )}
                     <p className="text-sm text-muted-foreground line-clamp-3">
                       {session.description}
                     </p>
@@ -1153,7 +1401,7 @@ function Sessions({
 
           {/* List View */}
           {selectedView === 'list' && filteredSessions.length > 0 && (
-            <div className="space-y-4">
+            <div className="space-y-4 px-4">
               {sessions.map((session) => (
                 <Card key={session.id}>
                   <div className="flex flex-col md:flex-row gap-4 p-4">
@@ -1189,6 +1437,12 @@ function Sessions({
                           <span className="font-medium">Instructor:</span>
                           <span>{session.instructor ? session.instructor.name : ''}</span>
                         </div>
+                        {formatSchedule(session.day_of_week, session.start_time, session.end_time) && (
+                          <div className="flex items-center gap-1 text-primary">
+                            <CalendarDays className="h-4 w-4" />
+                            <span>{formatSchedule(session.day_of_week, session.start_time, session.end_time)}</span>
+                          </div>
+                        )}
                       </div>
                       <p className="text-sm text-muted-foreground line-clamp-2">
                         {session.description}
@@ -1209,7 +1463,7 @@ function Sessions({
 
           {/* Pagination */}
           {filteredSessions.length > 0 && (
-            <div className="flex justify-center items-center gap-2 mt-8 mb-6">
+            <div className="flex justify-center items-center gap-2 mt-8 mb-6 px-4">
               <Button
                 variant="outline"
                 size="sm"

@@ -43,17 +43,35 @@ export function NavUser({
   // Function to handle logout
   const handleLogout = async () => {
     try {
-      await fetch('/api/auth/signout', {
+      // Show logout action in progress
+      const logoutResponse = await fetch('/api/auth/signout', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
+        // Using credentials: 'same-origin' ensures cookies are sent with the request
+        credentials: 'same-origin'
       });
       
-      // Add client-side navigation after logout
-      window.location.href = '/';
+      if (!logoutResponse.ok) {
+        throw new Error('Logout failed');
+      }
+      
+      // Clear any client-side state/cache
+      if (typeof window !== 'undefined') {
+        // Force a hard reload to clear any cached pages/state
+        window.location.href = '/';
+        
+        // Prevent any navigation during the redirect
+        window.onbeforeunload = () => {
+          // Return nothing to ensure no confirmation dialog
+          return;
+        };
+      }
     } catch (error) {
       console.error('Error during logout:', error);
+      // Fallback to direct navigation if the API call fails
+      window.location.href = '/';
     }
   };
 

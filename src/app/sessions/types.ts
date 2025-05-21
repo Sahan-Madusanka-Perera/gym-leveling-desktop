@@ -16,6 +16,9 @@ export interface Session {
   capacity: number;
   equipment: string[];
   benefits: string[];
+  day_of_week?: number | null; // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+  start_time?: string | null; // Format: "HH:MM:SS"
+  end_time?: string | null; // Format: "HH:MM:SS"
   created_at?: string;
   updated_at?: string;
 }
@@ -58,4 +61,14 @@ export const sessionTypes = [
   'Recovery',
   'Nutrition',
   'Personal Training'
+];
+
+export const daysOfWeek = [
+  { id: 0, name: 'Sunday' },
+  { id: 1, name: 'Monday' },
+  { id: 2, name: 'Tuesday' },
+  { id: 3, name: 'Wednesday' },
+  { id: 4, name: 'Thursday' },
+  { id: 5, name: 'Friday' },
+  { id: 6, name: 'Saturday' },
 ]; 
