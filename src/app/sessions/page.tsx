@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { Session, timeSlots, daysOfWeek, DaySchedule, SessionSchedule } from "./types";
 import { 
   getAllSessions,
@@ -27,9 +27,24 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import Image from "next/image";
 import Link from "next/link";
-import { CalendarDays, Clock, Grid, LayoutList, Users, Plus, Image as ImageIcon, Trash, Save, ListChecks, Info } from "lucide-react";
+import { 
+  CalendarDays, 
+  Clock, 
+  Grid, 
+  LayoutList, 
+  Users, 
+  Plus, 
+  Image as ImageIcon, 
+  Trash, 
+  Save, 
+  ListChecks, 
+  Info,
+  Search,
+  X
+} from "lucide-react";
 import moment from 'moment';
 import { toast } from "sonner";
+import { TimePicker } from "@/components/ui/time-picker"
 
 // Temporary mock data for weekSchedule until we implement it in Supabase
 const weekSchedule = [
@@ -129,11 +144,77 @@ function AddSessionDialog({ onSessionAdded }: { onSessionAdded: () => void }) {
     }
   }, [open]);
 
+  const handleSelectChange = (name: string, value: any) => {
+    if (name === 'start_time') {
+      const endTime = calculateEndTimeValue(value, formData.duration);
+      
+      setFormData(prev => ({
+        ...prev,
+        start_time: value,
+        end_time: endTime || prev.end_time
+      }));
+    } else if (name === 'duration' && formData.start_time) {
+      const endTime = calculateEndTimeValue(formData.start_time, Number(value));
+      
+      setFormData(prev => ({
+        ...prev,
+        duration: value,
+        end_time: endTime || prev.end_time
+      }));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        [name]: value
+      }));
+    }
+  };
+
+  const calculateEndTimeValue = (startTime: string, durationMinutes: number): string | null => {
+    if (!startTime) return null;
+    
+    try {
+      const [hours, minutes] = startTime.split(':').map(part => parseInt(part, 10));
+      if (isNaN(hours) || isNaN(minutes)) return null;
+      
+      const totalMinutes = hours * 60 + minutes + durationMinutes;
+      const endHours = Math.floor(totalMinutes / 60) % 24;
+      const endMinutes = totalMinutes % 60;
+      
+      return `${endHours.toString().padStart(2, '0')}:${endMinutes.toString().padStart(2, '0')}`;
+    } catch (error) {
+      console.error('Error calculating end time:', error);
+      return null;
+    }
+  };
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
     
-    // Auto-generate slug from title
+    if (name === 'duration') {
+      let durationVal = parseInt(value, 10);
+      
+      if (!isNaN(durationVal) && durationVal < 10) {
+        durationVal = 10;
+      }
+      
+      if (formData.start_time) {
+        const endTime = calculateEndTimeValue(formData.start_time, durationVal);
+        
+        setFormData(prev => ({
+          ...prev,
+          duration: durationVal,
+          end_time: endTime || prev.end_time
+        }));
+      } else {
+        setFormData(prev => ({
+          ...prev,
+          duration: isNaN(durationVal) ? prev.duration : durationVal
+        }));
+      }
+      
+      return;
+    }
+    
     if (name === 'title') {
       const slug = value
         .toLowerCase()
@@ -141,12 +222,19 @@ function AddSessionDialog({ onSessionAdded }: { onSessionAdded: () => void }) {
         .replace(/[\s_-]+/g, '-')
         .replace(/^-+|-+$/g, '');
       
-      setFormData(prev => ({ ...prev, slug }));
+      setFormData(prev => ({
+        ...prev,
+        title: value,
+        slug
+      }));
+      
+      return;
     }
-  };
-
-  const handleSelectChange = (name: string, value: any) => {
-    setFormData(prev => ({ ...prev, [name]: value }));
+    
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
   };
 
   const handleListChange = (name: 'equipment' | 'benefits', index: number, value: string) => {
@@ -159,7 +247,6 @@ function AddSessionDialog({ onSessionAdded }: { onSessionAdded: () => void }) {
 
   const addListItem = (name: 'equipment' | 'benefits') => {
     setFormData(prev => {
-      // Create a typed copy of the array
       const newItems = Array.isArray(prev[name]) ? 
         [...prev[name] as string[]] : 
         [];
@@ -170,7 +257,6 @@ function AddSessionDialog({ onSessionAdded }: { onSessionAdded: () => void }) {
 
   const removeListItem = (name: 'equipment' | 'benefits', index: number) => {
     setFormData(prev => {
-      // Create a typed copy of the array
       const newItems = Array.isArray(prev[name]) ? 
         [...prev[name] as string[]] : 
         [];
@@ -183,13 +269,11 @@ function AddSessionDialog({ onSessionAdded }: { onSessionAdded: () => void }) {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
       
-      // Check file type
       if (!file.type.startsWith('image/')) {
         alert('Please select an image file');
         return;
       }
       
-      // Check file size (max 2MB)
       if (file.size > 2 * 1024 * 1024) {
         alert('Image size should be less than 2MB');
         return;
@@ -197,7 +281,6 @@ function AddSessionDialog({ onSessionAdded }: { onSessionAdded: () => void }) {
       
       setImageFile(file);
       
-      // Create preview
       const reader = new FileReader();
       reader.onload = (event) => {
         setImagePreview(event.target?.result as string);
@@ -206,7 +289,6 @@ function AddSessionDialog({ onSessionAdded }: { onSessionAdded: () => void }) {
     }
   };
 
-  // Handle drag events for image upload
   const [dragActive, setDragActive] = useState(false);
   
   const handleDrag = (e: React.DragEvent) => {
@@ -228,13 +310,11 @@ function AddSessionDialog({ onSessionAdded }: { onSessionAdded: () => void }) {
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       const file = e.dataTransfer.files[0];
       
-      // Check file type
       if (!file.type.startsWith('image/')) {
         alert('Please select an image file');
         return;
       }
       
-      // Check file size (max 2MB)
       if (file.size > 2 * 1024 * 1024) {
         alert('Image size should be less than 2MB');
         return;
@@ -242,7 +322,6 @@ function AddSessionDialog({ onSessionAdded }: { onSessionAdded: () => void }) {
       
       setImageFile(file);
       
-      // Create preview
       const reader = new FileReader();
       reader.onload = (event) => {
         setImagePreview(event.target?.result as string);
@@ -279,12 +358,9 @@ function AddSessionDialog({ onSessionAdded }: { onSessionAdded: () => void }) {
     try {
       let imagePath = '/images/default-session.jpg';
       
-      // Show loading toast
       const toastId = toast.loading("Creating new session...");
       
-      // Handle image upload
       if (imageFile) {
-        // Generate unique filename with timestamp
         const timestamp = new Date().getTime();
         const extension = imageFile.name.split('.').pop();
         const filename = `${formData.slug}-${timestamp}.${extension}`;
@@ -295,11 +371,9 @@ function AddSessionDialog({ onSessionAdded }: { onSessionAdded: () => void }) {
         }
       }
       
-      // Filter out empty items from arrays
       const equipment = formData.equipment.filter(item => item.trim());
       const benefits = formData.benefits.filter(item => item.trim());
       
-      // Create session
       await addSession({
         ...formData,
         equipment,
@@ -308,20 +382,16 @@ function AddSessionDialog({ onSessionAdded }: { onSessionAdded: () => void }) {
         instructor_id: Number(formData.instructor_id)
       });
       
-      // Dismiss loading toast and show success
       toast.dismiss(toastId);
       toast.success("Session created successfully", {
         description: `${formData.title} has been added to the schedule`
       });
       
-      // Reset form and close dialog
       resetForm();
       setOpen(false);
       
-      // Notify parent to refresh data
       onSessionAdded();
     } catch (error) {
-      // Show error toast
       toast.error("Failed to create session", {
         description: error instanceof Error ? error.message : "An unexpected error occurred"
       });
@@ -330,7 +400,7 @@ function AddSessionDialog({ onSessionAdded }: { onSessionAdded: () => void }) {
       setIsLoading(false);
     }
   };
-  
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
@@ -472,8 +542,11 @@ function AddSessionDialog({ onSessionAdded }: { onSessionAdded: () => void }) {
                     value={formData.duration}
                     onChange={handleChange}
                     required
-                    min={5}
+                    min={10}
                   />
+                  <p className="text-xs text-muted-foreground">
+                    Minimum session duration is 10 minutes
+                  </p>
                 </div>
                 
                 <div className="space-y-2">
@@ -592,29 +665,54 @@ function AddSessionDialog({ onSessionAdded }: { onSessionAdded: () => void }) {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="start_time">Start Time</Label>
-                    <Input
-                      id="start_time"
-                      name="start_time"
-                      type="time"
+                    <TimePicker
                       value={formData.start_time || ''}
-                      onChange={handleChange}
-                      placeholder="e.g. 09:00"
+                      onChange={(value) => handleSelectChange('start_time', value)}
                     />
+                    <p className="text-xs text-muted-foreground">
+                      Select the session start time
+                    </p>
                   </div>
                   
                   <div className="space-y-2">
                     <Label htmlFor="end_time">End Time</Label>
-                    <Input
-                      id="end_time"
-                      name="end_time"
-                      type="time"
+                    <TimePicker
                       value={formData.end_time || ''}
-                      onChange={handleChange}
-                      placeholder="e.g. 10:00"
+                      onChange={(value) => handleSelectChange('end_time', value)}
+                      disabled={!!formData.start_time}
                     />
+                    {formData.start_time ? (
+                      <p className="text-xs text-muted-foreground">
+                        End time is calculated based on the {formData.duration} minute duration
+                      </p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">
+                        Set a start time to auto-calculate end time
+                      </p>
+                    )}
                   </div>
                 </div>
-                <p className="text-xs text-muted-foreground">
+                {formData.start_time && formData.end_time && (
+                  <div className="bg-muted p-2 rounded-md mt-2">
+                    <p className="text-sm flex items-center">
+                      <Clock className="mr-2 h-4 w-4 text-primary" />
+                      Session will run for {formData.duration} minutes, from{' '}
+                      <span className="font-medium mx-1">{
+                        new Date(`2000-01-01T${formData.start_time}:00`).toLocaleTimeString([], {
+                          hour: 'numeric',
+                          minute: '2-digit'
+                        })
+                      }</span> to{' '}
+                      <span className="font-medium mx-1">{
+                        new Date(`2000-01-01T${formData.end_time}:00`).toLocaleTimeString([], {
+                          hour: 'numeric',
+                          minute: '2-digit'
+                        })
+                      }</span>
+                    </p>
+                  </div>
+                )}
+                <p className="text-xs text-muted-foreground mt-2">
                   Scheduling is optional. If you don't set a day or time, the session can be scheduled flexibly.
                 </p>
               </div>
