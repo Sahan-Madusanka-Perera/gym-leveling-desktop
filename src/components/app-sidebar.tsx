@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import Image from "next/image"
+import { useTheme } from "next-themes"
 import { 
   ChartNoAxesCombined,
   LayoutDashboard,
@@ -91,6 +92,16 @@ const data = {
 }
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const { resolvedTheme } = useTheme();
+  const [mounted, setMounted] = React.useState(false);
+  
+  // Only show the theme-aware logo after mounting to avoid hydration mismatch
+  React.useEffect(() => setMounted(true), []);
+  
+  // Use default logo during SSR/hydration
+  const logoSrc = !mounted ? "/images/logo.png" : 
+                  resolvedTheme === "dark" ? "/images/logo_white.png" : "/images/logo.png";
+
   return (
     <Sidebar collapsible="offcanvas" {...props}>
       <SidebarHeader>
@@ -102,7 +113,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             >
               <a href="#" className="flex justify-center items-center h-[80px]">
               <Image 
-                src="/images/logo.png" 
+                src={logoSrc}
                 alt="Gym Leveling Logo" 
                 width={150} 
                 height={50} 
