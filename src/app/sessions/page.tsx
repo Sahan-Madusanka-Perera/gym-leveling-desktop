@@ -907,6 +907,31 @@ function getSessionColor(type: string): string {
   }
 }
 
+// Add this function to determine the time slot for a given session
+function getTimeSlotForSession(session: Session): string | null {
+  if (!session.start_time) return null;
+  
+  try {
+    const hourStr = session.start_time.split(':')[0];
+    const hour = parseInt(hourStr, 10);
+    
+    if (isNaN(hour)) return null;
+    
+    if (hour >= 5 && hour < 12) {
+      return 'Morning';
+    } else if (hour >= 12 && hour < 17) {
+      return 'Afternoon';
+    } else if (hour >= 17 && hour < 20) {
+      return 'Evening';
+    } else {
+      return 'Night';
+    }
+  } catch (error) {
+    console.error('Error parsing time:', error);
+    return null;
+  }
+}
+
 export default function SessionsPage() {
   const [allSessions, setAllSessions] = useState<Session[]>([]);
   const [filteredSessions, setFilteredSessions] = useState<Session[]>([]);
@@ -1006,33 +1031,34 @@ export default function SessionsPage() {
   // Tab change handler
   const handleTabChange = (value: string) => {
     setActiveTab(value);
+    
     if (value === "schedule") {
-      // No additional filtering needed for schedule
+      // No additional filtering needed for schedule view
     } else if (value !== "all") {
-      // Filter by time slot
+      // Clear all existing filters first
       setSelectedType(null);
       setSelectedInstructor(null);
       setSelectedIntensity(null);
       setSelectedDay(null);
+      setSearchTerm("");
       
-      // We'll use the search term to filter by time of day
-      const timeSlot = value.charAt(0).toUpperCase() + value.slice(1);
-      
-      // Create a list of all sessions that occur during this time slot
-      const sessionsInTimeSlot = weekSchedule.flatMap(day => 
-        day.sessions.filter(s => s.time === timeSlot)
-          .map(s => s.sessionId)
-      );
-      
-      // Filter the main sessions list to only include those in this time slot
-      const filtered = allSessions.filter(session => 
-        sessionsInTimeSlot.includes(session.id)
-      );
-      
-      setFilteredSessions(filtered);
+      if (value === "morning" || value === "afternoon" || value === "evening" || value === "night") {
+        // Get the time slot with first letter capitalized
+        const timeSlot = value.charAt(0).toUpperCase() + value.slice(1);
+        
+        // Filter sessions based on their start time
+        const filtered = allSessions.filter(session => {
+          const sessionTimeSlot = getTimeSlotForSession(session);
+          return sessionTimeSlot === timeSlot;
+        });
+        
+        setFilteredSessions(filtered);
+      }
     } else {
       // Reset filters when "All" is selected
       clearFilters();
+      // Add this line to show all sessions when "All" is selected
+      setFilteredSessions(allSessions);
     }
   };
 

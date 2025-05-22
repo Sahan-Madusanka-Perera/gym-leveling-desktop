@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { getSessionById } from "@/services/session-service";
-import { Session } from "../types";
+import { getSessionById, updateSession } from "@/services/session-service";
+import { Session, daysOfWeek } from "../types";
 import { Button, LoadingButton } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,14 +16,37 @@ import {
   Dumbbell,
   BellRing,
   CheckCircle,
-  Award 
+  Award,
+  Edit,
+  CalendarDays
 } from "lucide-react";
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogFooter 
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { TimePicker } from "@/components/ui/time-picker";
+import { toast } from "sonner";
+import { formatSchedule } from "@/app/sessions/utils";
 
 export default function SessionDetailPage() {
   const params = useParams();
   const router = useRouter();
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
+  
+  // Edit form state
+  const [editForm, setEditForm] = useState({
+    day_of_week: null as number | null,
+    start_time: '' as string | null,
+    end_time: '' as string | null
+  });
 
   useEffect(() => {
     const fetchSession = async () => {
@@ -35,6 +58,15 @@ export default function SessionDetailPage() {
         
         const sessionData = await getSessionById(params.id);
         setSession(sessionData || null);
+        
+        // Initialize edit form with session data
+        if (sessionData) {
+          setEditForm({
+            day_of_week: sessionData.day_of_week || null,
+            start_time: sessionData.start_time || '',
+            end_time: sessionData.end_time || ''
+          });
+        }
       } catch (error) {
         console.error("Failed to load session:", error);
       } finally {
@@ -55,6 +87,80 @@ export default function SessionDetailPage() {
       case 'Medium': return 'bg-orange-100 text-orange-800';
       case 'High': return 'bg-red-100 text-red-800';
       default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+  
+  const openEditDialog = () => {
+    if (session) {
+      setEditForm({
+        day_of_week: session.day_of_week || null,
+        start_time: session.start_time || '',
+        end_time: session.end_time || ''
+      });
+      setIsEditDialogOpen(true);
+    }
+  };
+  
+  const handleEditFormChange = (field: string, value: any) => {
+    setEditForm(prev => ({
+      ...prev,
+      [field]: value
+    }));
+    
+    // Auto-calculate end time based on start time and session duration
+    if (field === 'start_time' && value && session) {
+      const endTime = calculateEndTime(value, session.duration);
+      if (endTime) {
+        setEditForm(prev => ({
+          ...prev,
+          end_time: endTime
+        }));
+      }
+    }
+  };
+  
+  const calculateEndTime = (startTime: string, durationMinutes: number): string | null => {
+    if (!startTime) return null;
+    
+    try {
+      const [hours, minutes] = startTime.split(':').map(part => parseInt(part, 10));
+      if (isNaN(hours) || isNaN(minutes)) return null;
+      
+      // Calculate end time by adding duration
+      const totalMinutes = hours * 60 + minutes + durationMinutes;
+      const endHours = Math.floor(totalMinutes / 60) % 24;
+      const endMinutes = totalMinutes % 60;
+      
+      return `${endHours.toString().padStart(2, '0')}:${endMinutes.toString().padStart(2, '0')}`;
+    } catch (error) {
+      console.error('Error calculating end time:', error);
+      return null;
+    }
+  };
+  
+  const handleSaveSchedule = async () => {
+    if (!session) return;
+    
+    setIsUpdating(true);
+    try {
+      const updatedSession = await updateSession(session.id, {
+        day_of_week: editForm.day_of_week,
+        start_time: editForm.start_time,
+        end_time: editForm.end_time
+      });
+      
+      if (updatedSession) {
+        setSession(updatedSession);
+        toast.success("Session schedule updated successfully");
+        setIsEditDialogOpen(false);
+      }
+    } catch (error) {
+      console.error("Failed to update session:", error);
+      toast.error("Failed to update session schedule", {
+        description: error instanceof Error ? error.message : "An unexpected error occurred"
+      });
+    } finally {
+      setIsUpdating(false);
     }
   };
 
@@ -139,6 +245,32 @@ export default function SessionDetailPage() {
               </div>
             </div>
             
+            {/* Schedule Information with Edit Button */}
+            <div className="bg-secondary/10 p-4 rounded-lg flex justify-between items-center mb-6">
+              <div className="flex items-start gap-3">
+                <CalendarDays className="h-5 w-5 text-primary mt-1" />
+                <div>
+                  <p className="text-sm font-medium">Schedule</p>
+                  {session.day_of_week !== null && session.start_time ? (
+                    <p className="text-sm text-muted-foreground">
+                      {formatSchedule(session.day_of_week, session.start_time, session.end_time)}
+                    </p>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No specific schedule assigned</p>
+                  )}
+                </div>
+              </div>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={openEditDialog}
+                className="flex items-center gap-1"
+              >
+                <Edit className="h-3.5 w-3.5" />
+                Edit Schedule
+              </Button>
+            </div>
+            
             <div className="mb-6">
               <h2 className="text-xl font-semibold mb-3">Description</h2>
               <p className="text-muted-foreground">{session.description}</p>
@@ -215,7 +347,96 @@ export default function SessionDetailPage() {
         </div>
       </div>
 
-      {/* Related Sessions - Could be implemented in the future */}
+      {/* Edit Schedule Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Session Schedule</DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="day_of_week">Day of Week</Label>
+              <Select
+                value={editForm.day_of_week !== null ? editForm.day_of_week.toString() : "none"}
+                onValueChange={(value) => 
+                  handleEditFormChange('day_of_week', value === "none" ? null : parseInt(value))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select day of week (optional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No specific day</SelectItem>
+                  {daysOfWeek.map(day => (
+                    <SelectItem key={day.id} value={day.id.toString()}>
+                      {day.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="start_time">Start Time</Label>
+                <TimePicker
+                  value={editForm.start_time || ''}
+                  onChange={(value) => handleEditFormChange('start_time', value)}
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="end_time">End Time</Label>
+                <TimePicker
+                  value={editForm.end_time || ''}
+                  onChange={(value) => handleEditFormChange('end_time', value)}
+                  disabled={!!editForm.start_time}
+                />
+                {editForm.start_time && (
+                  <p className="text-xs text-muted-foreground">
+                    End time is calculated based on duration ({session.duration} minutes)
+                  </p>
+                )}
+              </div>
+            </div>
+            
+            {editForm.start_time && editForm.end_time && (
+              <div className="bg-muted p-2 rounded-md mt-2">
+                <p className="text-sm flex items-center">
+                  <Clock className="mr-2 h-4 w-4 text-primary" />
+                  Session will run for {session.duration} minutes, from{' '}
+                  <span className="font-medium mx-1">{
+                    new Date(`2000-01-01T${editForm.start_time}:00`).toLocaleTimeString([], {
+                      hour: 'numeric',
+                      minute: '2-digit'
+                    })
+                  }</span> to{' '}
+                  <span className="font-medium mx-1">{
+                    new Date(`2000-01-01T${editForm.end_time}:00`).toLocaleTimeString([], {
+                      hour: 'numeric',
+                      minute: '2-digit'
+                    })
+                  }</span>
+                </p>
+              </div>
+            )}
+            
+            <p className="text-xs text-muted-foreground mt-2">
+              You can leave these empty to remove any specific schedule assignment.
+            </p>
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" onClick={handleSaveSchedule} disabled={isUpdating}>
+              {isUpdating ? 'Saving...' : 'Save Changes'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 } 

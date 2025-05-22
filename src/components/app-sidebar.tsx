@@ -11,7 +11,8 @@ import {
   CircleHelp,
   Search,
   ClipboardList,
-  Activity
+  Activity,
+  Briefcase
  } from "lucide-react"
 
 import { NavMain } from "@/components/nav-main"
@@ -63,6 +64,11 @@ const data = {
       title: "Sessions",
       url: "/sessions",
       icon: ClipboardList,
+    },
+    {
+      title: "Equipments",
+      url: "/equipments",
+      icon: Briefcase,
     },
   ],
   navSecondary: [

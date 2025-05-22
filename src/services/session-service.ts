@@ -1,4 +1,5 @@
-import { Session, DaySchedule, SessionSchedule } from "@/app/sessions/types";
+import { Session } from "@/app/sessions/types";
+import { DaySchedule, SessionSchedule } from "@/app/sessions/types";
 import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
@@ -241,4 +242,47 @@ export async function filterSessions({
   }
 
   return data || [];
+}
+
+/**
+ * Update an existing session by ID
+ */
+export async function updateSession(id: string, sessionData: Partial<Session>): Promise<Session | null> {
+  try {
+    // First get the current session to merge with updates
+    const { data: currentSession } = await supabase
+      .from('sessions')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (!currentSession) {
+      throw new Error('Session not found');
+    }
+
+    // Update the session
+    const { data, error } = await supabase
+      .from('sessions')
+      .update(sessionData)
+      .eq('id', id)
+      .select(`
+        *,
+        instructor:Trainer (
+          name,
+          specialization,
+          contact
+        )
+      `)
+      .single();
+
+    if (error) {
+      console.error('Error updating session:', error);
+      throw error;
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Failed to update session:', error);
+    throw error;
+  }
 } 
