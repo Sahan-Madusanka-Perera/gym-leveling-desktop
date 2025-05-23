@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { headers } from 'next/headers'
 
 export async function middleware(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({
+  const supabaseResponse = NextResponse.next({
     request,
   });
 

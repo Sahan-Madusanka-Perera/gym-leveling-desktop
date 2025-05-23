@@ -46,3 +46,35 @@ export async function createClient() {
     }
   )
 }
+
+// Create a service role client that bypasses RLS
+export async function createServiceClient() {
+  const cookieStore = await cookies();
+  
+  // Make sure to set the SUPABASE_SERVICE_ROLE_KEY in your environment variables
+  // This is a secret key that should never be exposed to the client
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!, // SERVICE_ROLE key bypasses RLS
+    {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll();
+        },
+        setAll(cookiesToSet) {
+          try {
+            cookiesToSet.forEach(({ name, value, options }) =>
+              cookieStore.set(name, value, options)
+            );
+          } catch {
+            // The `setAll` method was called from a Server Component.
+          }
+        },
+      },
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    }
+  )
+}

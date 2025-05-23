@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import Image from "next/image"
+import { useTheme } from "next-themes"
 import { 
   ChartNoAxesCombined,
   LayoutDashboard,
@@ -11,7 +12,8 @@ import {
   CircleHelp,
   Search,
   ClipboardList,
-  Activity
+  Activity,
+  Briefcase
  } from "lucide-react"
 
 import { NavMain } from "@/components/nav-main"
@@ -56,13 +58,18 @@ const data = {
     },
     {
       title: "Exercises",
-      url: "#",
+      url: "/exercises",
       icon: Activity,
     },
     {
       title: "Sessions",
-      url: "#",
+      url: "/sessions",
       icon: ClipboardList,
+    },
+    {
+      title: "Equipments",
+      url: "/equipments",
+      icon: Briefcase,
     },
   ],
   navSecondary: [
@@ -85,6 +92,16 @@ const data = {
 }
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const { resolvedTheme } = useTheme();
+  const [mounted, setMounted] = React.useState(false);
+  
+  // Only show the theme-aware logo after mounting to avoid hydration mismatch
+  React.useEffect(() => setMounted(true), []);
+  
+  // Use default logo during SSR/hydration
+  const logoSrc = !mounted ? "/images/logo.png" : 
+                  resolvedTheme === "dark" ? "/images/logo_white.png" : "/images/logo.png";
+
   return (
     <Sidebar collapsible="offcanvas" {...props}>
       <SidebarHeader>
@@ -96,7 +113,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             >
               <a href="#" className="flex justify-center items-center h-[80px]">
               <Image 
-                src="/images/logo.png" 
+                src={logoSrc}
                 alt="Gym Leveling Logo" 
                 width={150} 
                 height={50} 

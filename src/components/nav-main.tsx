@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import {
   SidebarGroup,
@@ -20,20 +21,29 @@ export function NavMain({
     icon?: React.ForwardRefExoticComponent<any> // This accepts Lucide icons
   }[]
 }) {
+  const pathname = usePathname()
+  
   return (
     <SidebarGroup>
       <SidebarGroupContent className="flex flex-col gap-2">
         <SidebarMenu>
-          {items.map((item) => (
-            <SidebarMenuItem key={item.title}>
-              <Link href={item.url}>
-                <SidebarMenuButton tooltip={item.title} className="flex items-center gap-2">
-                  {item.icon && <item.icon />}
-                  <span>{item.title}</span>
-                </SidebarMenuButton>
-              </Link>
-            </SidebarMenuItem>
-          ))}
+          {items.map((item) => {
+            const isActive = pathname === item.url || pathname.startsWith(`${item.url}/`)
+            
+            return (
+              <SidebarMenuItem key={item.title}>
+                <Link href={item.url}>
+                  <SidebarMenuButton 
+                    tooltip={item.title} 
+                    className={`flex items-center gap-2 ${isActive ? "bg-primary/10 text-primary font-medium" : ""}`}
+                  >
+                    {item.icon && <item.icon className={isActive ? "text-primary" : ""} />}
+                    <span>{item.title}</span>
+                  </SidebarMenuButton>
+                </Link>
+              </SidebarMenuItem>
+            )
+          })}
         </SidebarMenu>
       </SidebarGroupContent>
     </SidebarGroup>

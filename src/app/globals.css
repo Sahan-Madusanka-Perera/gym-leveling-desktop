@@ -119,5 +119,27 @@
   }
   body {
     @apply bg-background text-foreground;
+    transition: background-color 0.2s ease;
+  }
+
+  /* Apply transition only to specific elements that need it */
+  .theme-aware {
+    transition-property: background-color, border-color, color, box-shadow;
+    transition-duration: 0.2s;
+    transition-timing-function: ease;
+    will-change: background-color, border-color, color;
+  }
+
+  /* Fast transitions for card components */
+  .card, .dialog, .popover {
+    transition-property: background-color, border-color;
+    transition-duration: 0.15s;
+    transition-timing-function: ease;
+    will-change: background-color, border-color;
+  }
+
+  /* Prevent transition on page load */
+  .no-transition * {
+    transition: none !important;
   }
 }
