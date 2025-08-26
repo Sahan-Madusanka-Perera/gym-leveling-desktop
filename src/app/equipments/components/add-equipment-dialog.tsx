@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Equipment, equipmentCategories, equipmentStatuses } from "../types";
+import { EquipmentUI, equipmentCategories, equipmentStatuses } from "../types";
 import { addEquipment } from "@/services/equipment-service";
 import {
   Dialog,
@@ -37,7 +37,7 @@ export default function AddEquipmentDialog({ onEquipmentAdded }: AddEquipmentDia
   const [activeTab, setActiveTab] = useState('basic-info');
   
   // Form state
-  const [formData, setFormData] = useState<Omit<Equipment, 'id'>>({
+  const [formData, setFormData] = useState<Omit<EquipmentUI, 'id'>>({
     name: '',
     description: '',
     category: 'Cardio',

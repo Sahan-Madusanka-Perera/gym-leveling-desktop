@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { Equipment, equipmentCategories, equipmentStatuses } from "./types";
+import { EquipmentUI, equipmentCategories, equipmentStatuses } from "./types";
 import { 
   getAllEquipments, 
   filterEquipments, 
@@ -47,14 +47,14 @@ import {
   Grid,
   LayoutList
 } from "lucide-react";
-import Link from "next/link";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import AddEquipmentDialog from "./components/add-equipment-dialog";
 import EquipmentDetails from "./components/equipment-details";
+import EditEquipmentDialog from "./components/edit-equipment-dialog";
 
 export default function EquipmentsPage() {
-  const [allEquipments, setAllEquipments] = useState<Equipment[]>([]);
-  const [filteredEquipments, setFilteredEquipments] = useState<Equipment[]>([]);
+  const [allEquipments, setAllEquipments] = useState<EquipmentUI[]>([]);
+  const [filteredEquipments, setFilteredEquipments] = useState<EquipmentUI[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedView, setSelectedView] = useState<'grid' | 'table'>('table');
   
@@ -322,11 +322,10 @@ export default function EquipmentsPage() {
                                   >
                                     <Eye className="h-4 w-4" />
                                   </Button>
-                                  <Link href={`/equipments/${equipment.id}/edit`}>
-                                    <Button variant="outline" size="sm">
-                                      <Edit className="h-4 w-4" />
-                                    </Button>
-                                  </Link>
+                                  <EditEquipmentDialog
+                                    equipmentId={equipment.id}
+                                    onEquipmentUpdated={refreshEquipments}
+                                  />
                                   <Button 
                                     variant="outline" 
                                     size="sm"
@@ -395,12 +394,11 @@ export default function EquipmentsPage() {
                           <Eye className="h-4 w-4 mr-2" />
                           View
                         </Button>
-                        <Link href={`/equipments/${equipment.id}/edit`} className="flex-1">
-                          <Button variant="outline" size="sm" className="w-full">
-                            <Edit className="h-4 w-4 mr-2" />
-                            Edit
-                          </Button>
-                        </Link>
+                        <EditEquipmentDialog
+                          equipmentId={equipment.id}
+                          onEquipmentUpdated={refreshEquipments}
+                          variant="text"
+                        />
                         <Button 
                           variant="outline" 
                           size="sm"

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { Equipment } from "../types";
+import { EquipmentUI } from "../types";
 import { getEquipmentById } from "@/services/equipment-service";
 import { LoadingButton } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -13,7 +13,7 @@ interface EquipmentDetailsProps {
 }
 
 export default function EquipmentDetails({ equipmentId }: EquipmentDetailsProps) {
-  const [equipment, setEquipment] = useState<Equipment | null>(null);
+  const [equipment, setEquipment] = useState<EquipmentUI | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {

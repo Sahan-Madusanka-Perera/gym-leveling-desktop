@@ -1,5 +1,5 @@
 "use client"
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -27,6 +27,12 @@ const levelDistributionData = [
   { name: 'Level 5+', value: 5, color: '#a4de6c' }
 ];
 
+interface UserDistributionData {
+  name: string;
+  value: number;
+  color: string;
+}
+
 const popularExercisesData = [
   { name: 'Bench Press', count: 320 },
   { name: 'Squats', count: 280 },
@@ -48,125 +54,219 @@ const userActivityByTimeData = [
 
 const GymDashboardCharts = () => {
   const [timeframe, setTimeframe] = useState('monthly');
+  const [userDistributionData, setUserDistributionData] = useState<UserDistributionData[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchUserDistribution = async () => {
+      try {
+        const response = await fetch('/api/user-distribution');
+        const result = await response.json();
+        
+        if (result.success) {
+          setUserDistributionData(result.data);
+        } else {
+          console.error('Failed to fetch user distribution:', result.error);
+          // Fallback to mock data
+          setUserDistributionData([
+            { name: 'Mobile Only Users', value: 35, color: '#8884d8' },
+            { name: 'Gym Members with Mobile', value: 65, color: '#82ca9d' }
+          ]);
+        }
+      } catch (error) {
+        console.error('Error fetching user distribution:', error);
+        // Fallback to mock data
+        setUserDistributionData([
+          { name: 'Mobile Only Users', value: 35, color: '#8884d8' },
+          { name: 'Gym Members with Mobile', value: 65, color: '#82ca9d' }
+        ]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUserDistribution();
+  }, []);
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-      {/* XP and Leveling Chart */}
-      <Card className="col-span-2">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <div>
-            <CardTitle>Member Progression</CardTitle>
-            <CardDescription>XP gained and attendance over time</CardDescription>
-          </div>
-          <Select defaultValue={timeframe} onValueChange={setTimeframe}>
-            <SelectTrigger className="w-36">
-              <SelectValue placeholder="Select timeframe" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="weekly">Weekly</SelectItem>
-              <SelectItem value="monthly">Monthly</SelectItem>
-              <SelectItem value="yearly">Yearly</SelectItem>
-            </SelectContent>
-          </Select>
-        </CardHeader>
-        <CardContent className="pt-6">
-          <ResponsiveContainer width="100%" height={350}>
-            <LineChart
-              data={memberActivityData}
-              margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="name" />
-              <YAxis yAxisId="left" />
-              <YAxis yAxisId="right" orientation="right" />
-              <Tooltip />
-              <Legend />
-              <Line yAxisId="left" type="monotone" dataKey="xp" stroke="#8884d8" name="XP Gained" strokeWidth={2} activeDot={{ r: 8 }} />
-              <Line yAxisId="right" type="monotone" dataKey="attendance" stroke="#82ca9d" name="Check-ins" strokeWidth={2} />
-            </LineChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
-
-      {/* Level Distribution */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Level Distribution</CardTitle>
-          <CardDescription>Member levels breakdown</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <ResponsiveContainer width="100%" height={220}>
-            <PieChart>
-              <Pie
-                data={levelDistributionData}
-                cx="50%"
-                cy="50%"
-                innerRadius={60}
-                outerRadius={80}
-                fill="#8884d8"
-                paddingAngle={5}
-                dataKey="value"
-                label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
+    <div className="grid gap-4">
+      {/* Top Row - Main Charts */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {/* XP and Leveling Chart */}
+        <Card className="lg:col-span-2">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <div>
+              <CardTitle>Member Progression</CardTitle>
+              <CardDescription>XP gained and attendance over time</CardDescription>
+            </div>
+            <Select defaultValue={timeframe} onValueChange={setTimeframe}>
+              <SelectTrigger className="w-36">
+                <SelectValue placeholder="Select timeframe" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="weekly">Weekly</SelectItem>
+                <SelectItem value="monthly">Monthly</SelectItem>
+                <SelectItem value="yearly">Yearly</SelectItem>
+              </SelectContent>
+            </Select>
+          </CardHeader>
+          <CardContent className="pt-6">
+            <ResponsiveContainer width="100%" height={350}>
+              <LineChart
+                data={memberActivityData}
+                margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
               >
-                {levelDistributionData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={entry.color} />
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="name" />
+                <YAxis yAxisId="left" />
+                <YAxis yAxisId="right" orientation="right" />
+                <Tooltip />
+                <Legend />
+                <Line yAxisId="left" type="monotone" dataKey="xp" stroke="#8884d8" name="XP Gained" strokeWidth={2} activeDot={{ r: 8 }} />
+                <Line yAxisId="right" type="monotone" dataKey="attendance" stroke="#82ca9d" name="Check-ins" strokeWidth={2} />
+              </LineChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        {/* User Distribution */}
+        <Card>
+          <CardHeader>
+            <CardTitle>User Distribution</CardTitle>
+            <CardDescription>Mobile vs Gym Member breakdown</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={350}>
+              <PieChart>
+                <Pie
+                  data={userDistributionData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={50}
+                  outerRadius={80}
+                  fill="#8884d8"
+                  paddingAngle={5}
+                  dataKey="value"
+                  label={({ name, percent }) => `${(percent * 100).toFixed(0)}%`}
+                  labelLine={false}
+                >
+                  {userDistributionData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip 
+                  formatter={(value, name) => [`${value} users`, name]} 
+                  labelFormatter={() => ''} 
+                />
+              </PieChart>
+            </ResponsiveContainer>
+            {loading && (
+              <div className="flex justify-center items-center h-48">
+                <div className="text-sm text-muted-foreground">Loading user distribution...</div>
+              </div>
+            )}
+            {/* Legend */}
+            {!loading && userDistributionData.length > 0 && (
+              <div className="flex flex-col gap-2 mt-4">
+                {userDistributionData.map((entry, index) => (
+                  <div key={`legend-${index}`} className="flex items-center gap-2">
+                    <div 
+                      className="w-3 h-3 rounded-full" 
+                      style={{ backgroundColor: entry.color }}
+                    />
+                    <span className="text-sm text-muted-foreground">
+                      {entry.name}: {entry.value} users
+                    </span>
+                  </div>
                 ))}
-              </Pie>
-              <Tooltip formatter={(value) => [`${value} members`, 'Count']} />
-            </PieChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
 
-      {/* Popular Exercises */}
-      <Card className="col-span-2">
-        <CardHeader>
-          <CardTitle>Top Exercises</CardTitle>
-          <CardDescription>Most popular exercises among members</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart
-              data={popularExercisesData}
-              margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="name" />
-              <YAxis />
-              <Tooltip />
-              <Legend />
-              <Bar dataKey="count" name="Usage Count" fill="#8884d8" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
+      {/* Middle Row - Analysis Charts */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {/* Popular Exercises */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Top Exercises</CardTitle>
+            <CardDescription>Most popular exercises among members</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={280}>
+              <BarChart
+                data={popularExercisesData}
+                margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="name" />
+                <YAxis />
+                <Tooltip />
+                <Legend />
+                <Bar dataKey="count" name="Usage Count" fill="#8884d8" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
 
-      {/* Gym Traffic by Time */}
+        {/* Level Distribution */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Level Distribution</CardTitle>
+            <CardDescription>Member levels breakdown</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={280}>
+              <PieChart>
+                <Pie
+                  data={levelDistributionData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={60}
+                  outerRadius={90}
+                  fill="#8884d8"
+                  paddingAngle={5}
+                  dataKey="value"
+                  label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
+                >
+                  {levelDistributionData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip formatter={(value) => [`${value} members`, 'Count']} />
+              </PieChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        {/* Gym Traffic by Time */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Gym Traffic</CardTitle>
+            <CardDescription>Members by time of day</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={280}>
+              <BarChart
+                data={userActivityByTimeData}
+                margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                layout="vertical"
+              >
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis type="number" />
+                <YAxis type="category" dataKey="time" />
+                <Tooltip />
+                <Legend />
+                <Bar dataKey="users" name="Members" fill="#82ca9d" radius={[0, 4, 4, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Bottom Row - Detailed Activity Tabs */}
       <Card>
-        <CardHeader>
-          <CardTitle>Gym Traffic</CardTitle>
-          <CardDescription>Members by time of day</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart
-              data={userActivityByTimeData}
-              margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-              layout="vertical"
-            >
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis type="number" />
-              <YAxis type="category" dataKey="time" />
-              <Tooltip />
-              <Legend />
-              <Bar dataKey="users" name="Members" fill="#82ca9d" radius={[0, 4, 4, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
-
-      {/* Activity Details Tabs */}
-      <Card className="col-span-3">
         <CardHeader>
           <CardTitle>Activity Details</CardTitle>
           <CardDescription>Workouts, exercises, and leveling metrics</CardDescription>
