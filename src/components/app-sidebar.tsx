@@ -13,7 +13,8 @@ import {
   Search,
   ClipboardList,
   Activity,
-  Briefcase
+  Briefcase,
+  FileText
  } from "lucide-react"
 
 import { NavMain } from "@/components/nav-main"
@@ -55,6 +56,11 @@ const data = {
       title: "Analytics",
       url: "/analytics",
       icon: ChartNoAxesCombined,
+    },
+    {
+      title: "Insights",
+      url: "/insights",
+      icon: FileText,
     },
     {
       title: "Exercises",

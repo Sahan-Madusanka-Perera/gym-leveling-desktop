@@ -32,6 +32,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { TimePicker } from "@/components/ui/time-picker";
 import { toast } from "sonner";
 import { formatSchedule } from "@/app/sessions/utils";
+import { BookingDialog } from "@/components/booking-dialog";
+import { SessionBookingsDialog } from "@/components/session-bookings-dialog";
 
 export default function SessionDetailPage() {
   const params = useParams();
@@ -304,9 +306,12 @@ export default function SessionDetailPage() {
         
         {/* Right Column - Sidebar */}
         <div className="md:col-span-1">
-          <Card className="sticky top-24">
+          <Card className="mb-6">
             <CardHeader>
-              <CardTitle>Book This Session</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <Calendar className="h-5 w-5" />
+                Session Booking
+              </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center justify-between">
@@ -318,11 +323,30 @@ export default function SessionDetailPage() {
                 <span>{session.duration} minutes</span>
               </div>
               <div className="flex items-center justify-between">
+                <span className="font-medium">Capacity:</span>
+                <span>{session.capacity} people</span>
+              </div>
+              <div className="flex items-center justify-between">
                 <span className="font-medium">Intensity:</span>
                 <Badge variant="outline" className={getIntensityColor(session.intensity)}>
                   {session.intensity}
                 </Badge>
               </div>
+              
+              {/* Schedule Display */}
+              {session.day_of_week !== null && session.start_time && (
+                <div className="bg-blue-50 border border-blue-200 p-3 rounded-md">
+                  <div className="flex items-center gap-2">
+                    <CalendarDays className="h-4 w-4 text-blue-600" />
+                    <div>
+                      <p className="text-sm font-medium text-blue-900">Scheduled Time</p>
+                      <p className="text-sm text-blue-700">
+                        {formatSchedule(session.day_of_week, session.start_time, session.end_time)}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
               
               <div className="bg-secondary/10 p-3 rounded-md space-y-2">
                 <div className="flex items-center gap-2">
@@ -340,9 +364,65 @@ export default function SessionDetailPage() {
               </div>
             </CardContent>
             <CardFooter className="flex flex-col gap-3">
-              <Button className="w-full">Book Now</Button>
-              <Button variant="outline" className="w-full">Add to Favorites</Button>
+              <BookingDialog
+                sessionId={session.id}
+                sessionTitle={session.title}
+                onBookingSuccess={() => {
+                  toast.success('Booking created successfully!');
+                }}
+              >
+                <Button className="w-full">
+                  <Calendar className="mr-2 h-4 w-4" />
+                  Book Now
+                </Button>
+              </BookingDialog>
+              
+              <SessionBookingsDialog
+                sessionId={session.id}
+                sessionTitle={session.title}
+              >
+                <Button variant="outline" className="w-full">
+                  <Users className="mr-2 h-4 w-4" />
+                  Manage Bookings
+                </Button>
+              </SessionBookingsDialog>
             </CardFooter>
+          </Card>
+          
+          {/* Additional Information Card */}
+          <Card className="mt-6">
+            <CardHeader>
+              <CardTitle className="text-lg">Session Information</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div>
+                <h4 className="font-medium mb-2">What to Bring</h4>
+                <ul className="text-sm text-muted-foreground space-y-1">
+                  <li>• Water bottle</li>
+                  <li>• Comfortable workout attire</li>
+                  <li>• Towel</li>
+                  {session.equipment.length > 0 && (
+                    <li>• Equipment will be provided</li>
+                  )}
+                </ul>
+              </div>
+              
+              <div>
+                <h4 className="font-medium mb-2">Cancellation Policy</h4>
+                <p className="text-sm text-muted-foreground">
+                  Cancel up to 24 hours before the session starts for a full refund.
+                </p>
+              </div>
+              
+              {session.instructor && (
+                <div>
+                  <h4 className="font-medium mb-2">Instructor</h4>
+                  <p className="text-sm text-muted-foreground">
+                    {session.instructor.name}
+                  </p>
+                </div>
+              )}
+            </CardContent>
           </Card>
         </div>
       </div>

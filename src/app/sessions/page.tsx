@@ -44,7 +44,9 @@ import {
 } from "lucide-react";
 import moment from 'moment';
 import { toast } from "sonner";
-import { TimePicker } from "@/components/ui/time-picker"
+import { BookingDialog } from "@/components/booking-dialog";
+import { SessionBookingsDialog } from "@/components/session-bookings-dialog";
+import { TimePicker } from "@/components/ui/time-picker";
 
 // Temporary mock data for weekSchedule until we implement it in Supabase
 const weekSchedule = [
@@ -1470,53 +1472,79 @@ function Sessions({
           {selectedView === 'grid' && filteredSessions.length > 0 && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 px-4">
               {sessions.map((session) => (
-                <Card key={session.id} className="overflow-hidden h-full flex flex-col">
-                  <div className="aspect-square relative overflow-hidden bg-secondary/20">
-                    <Image
-                      src={session.image}
-                      alt={session.title}
-                      fill
-                      className="object-cover"
-                      unoptimized
-                    />
-                  </div>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-lg font-semibold truncate" title={session.title}>
-                      {session.title}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="pb-2 flex-grow">
-                    <div className="flex flex-wrap gap-2 mb-3">
-                      <Badge variant="outline" className={getIntensityColor(session.intensity)}>
-                        {session.intensity} Intensity
-                      </Badge>
-                      <Badge variant="outline" className="bg-secondary/10">
-                        {session.type}
-                      </Badge>
+                <Card key={session.id} className="overflow-hidden h-full flex flex-col hover:shadow-lg transition-all duration-200 group">
+                  <Link href={`/sessions/${session.id}`} className="block">
+                    <div className="aspect-square relative overflow-hidden bg-secondary/20">
+                      <Image
+                        src={session.image}
+                        alt={session.title}
+                        fill
+                        className="object-cover group-hover:scale-105 transition-transform duration-300"
+                        unoptimized
+                      />
                     </div>
-                    <div className="flex items-center gap-1 mb-2 text-sm text-muted-foreground">
-                      <Clock className="h-4 w-4" />
-                      <span>{session.duration} min</span>
-                      <span className="mx-2">•</span>
-                      <Users className="h-4 w-4" />
-                      <span>Capacity: {session.capacity}</span>
-                    </div>
-                    {formatSchedule(session.day_of_week, session.start_time, session.end_time) && (
-                      <div className="flex items-center gap-1 mb-2 text-sm text-primary">
-                        <CalendarDays className="h-4 w-4" />
-                        <span>{formatSchedule(session.day_of_week, session.start_time, session.end_time)}</span>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-lg font-semibold truncate group-hover:text-primary transition-colors" title={session.title}>
+                        {session.title}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="pb-2 flex-grow">
+                      <div className="flex flex-wrap gap-2 mb-3">
+                        <Badge variant="outline" className={getIntensityColor(session.intensity)}>
+                          {session.intensity} Intensity
+                        </Badge>
+                        <Badge variant="outline" className="bg-secondary/10">
+                          {session.type}
+                        </Badge>
                       </div>
-                    )}
-                    <p className="text-sm text-muted-foreground line-clamp-3">
-                      {session.description}
-                    </p>
-                  </CardContent>
-                  <CardFooter>
+                      <div className="flex items-center gap-1 mb-2 text-sm text-muted-foreground">
+                        <Clock className="h-4 w-4" />
+                        <span>{session.duration} min</span>
+                        <span className="mx-2">•</span>
+                        <Users className="h-4 w-4" />
+                        <span>Capacity: {session.capacity}</span>
+                      </div>
+                      {formatSchedule(session.day_of_week, session.start_time, session.end_time) && (
+                        <div className="flex items-center gap-1 mb-2 text-sm text-primary">
+                          <CalendarDays className="h-4 w-4" />
+                          <span>{formatSchedule(session.day_of_week, session.start_time, session.end_time)}</span>
+                        </div>
+                      )}
+                      <p className="text-sm text-muted-foreground line-clamp-3">
+                        {session.description}
+                      </p>
+                    </CardContent>
+                  </Link>
+                  <CardFooter className="flex flex-col gap-2">
                     <Link href={`/sessions/${session.id}`} className="w-full">
                       <Button variant="outline" size="sm" className="w-full">
+                        <Info className="mr-2 h-4 w-4" />
                         View Details
                       </Button>
                     </Link>
+                    
+                    <div className="flex gap-2">
+                      <BookingDialog
+                        sessionId={session.id}
+                        sessionTitle={session.title}
+                        onBookingSuccess={() => {
+                          console.log('Booking created successfully');
+                        }}
+                      >
+                        <Button size="sm" className="flex-1">
+                          Book Now
+                        </Button>
+                      </BookingDialog>
+                      
+                      <SessionBookingsDialog
+                        sessionId={session.id}
+                        sessionTitle={session.title}
+                      >
+                        <Button variant="outline" size="sm" className="flex-1">
+                          Manage
+                        </Button>
+                      </SessionBookingsDialog>
+                    </div>
                   </CardFooter>
                 </Card>
               ))}
@@ -1527,19 +1555,21 @@ function Sessions({
           {selectedView === 'list' && filteredSessions.length > 0 && (
             <div className="space-y-4 px-4">
               {sessions.map((session) => (
-                <Card key={session.id}>
+                <Card key={session.id} className="hover:shadow-lg transition-all duration-200 group">
                   <div className="flex flex-col md:flex-row gap-4 p-4">
-                    <div className="w-full md:w-32 h-32 relative overflow-hidden bg-secondary/20 shrink-0 rounded-md">
+                    <Link href={`/sessions/${session.id}`} className="w-full md:w-32 h-32 relative overflow-hidden bg-secondary/20 shrink-0 rounded-md block">
                       <Image
                         src={session.image}
                         alt={session.title}
                         fill
-                        className="object-cover"
+                        className="object-cover group-hover:scale-105 transition-transform duration-300"
                         unoptimized
                       />
-                    </div>
+                    </Link>
                     <div className="flex-grow">
-                      <h3 className="text-lg font-semibold mb-2">{session.title}</h3>
+                      <Link href={`/sessions/${session.id}`} className="block">
+                        <h3 className="text-lg font-semibold mb-2 group-hover:text-primary transition-colors">{session.title}</h3>
+                      </Link>
                       <div className="flex flex-wrap gap-2 mb-3">
                         <Badge variant="outline" className={getIntensityColor(session.intensity)}>
                           {session.intensity} Intensity
@@ -1572,12 +1602,36 @@ function Sessions({
                         {session.description}
                       </p>
                     </div>
-                    <div className="shrink-0 flex items-center mt-4 md:mt-0">
-                      <Link href={`/sessions/${session.id}`}>
-                        <Button variant="outline" size="sm">
+                    <div className="shrink-0 flex flex-col gap-2 mt-4 md:mt-0 md:w-40">
+                      <Link href={`/sessions/${session.id}`} className="w-full">
+                        <Button variant="outline" size="sm" className="w-full">
+                          <Info className="mr-2 h-4 w-4" />
                           View Details
                         </Button>
                       </Link>
+                      
+                      <div className="flex gap-2">
+                        <BookingDialog
+                          sessionId={session.id}
+                          sessionTitle={session.title}
+                          onBookingSuccess={() => {
+                            console.log('Booking created successfully');
+                          }}
+                        >
+                          <Button size="sm" className="flex-1">
+                            Book
+                          </Button>
+                        </BookingDialog>
+                        
+                        <SessionBookingsDialog
+                          sessionId={session.id}
+                          sessionTitle={session.title}
+                        >
+                          <Button variant="outline" size="sm" className="flex-1">
+                            Manage
+                          </Button>
+                        </SessionBookingsDialog>
+                      </div>
                     </div>
                   </div>
                 </Card>
