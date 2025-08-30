@@ -56,6 +56,13 @@ interface LevelDistributionData {
   value: number;
   color: string;
 }
+interface EquipmentDistributionData {
+  equipmentId: number;
+  equipmentName: string;
+  available: number;
+  inUse: number;
+  underMaintenance: number;
+}
 
 const popularExercisesData = [
   { name: "Bench Press", count: 320 },
@@ -210,6 +217,43 @@ const GymDashboardCharts = () => {
     fetchLevelDistribution();
   }, []);
 
+  //---------------------------------------------------------------------------------------------------------------------------
+  const [equipmentData, setEquipmentData] = useState<
+    EquipmentDistributionData[]
+  >([]);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchEquipmentDistribution = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const response = await fetch("/api/equipment-distribution");
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const result = await response.json();
+
+        if (result.success) {
+          setEquipmentData(result.data);
+        } else {
+          throw new Error(result.error || "Failed to fetch equipment data");
+        }
+      } catch (error) {
+        console.error("Error fetching equipment distribution:", error);
+        setError(
+          error instanceof Error ? error.message : "Unknown error occurred"
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchEquipmentDistribution();
+  }, []);
   //---------------------------------------------------------------------------------------------------------------------------
   return (
     <div className="grid gap-4">
@@ -494,6 +538,8 @@ const GymDashboardCharts = () => {
       </div>
 
       {/* Bottom Row - Detailed Activity Tabs */}
+
+      {/* <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3"> */}
       <Card>
         <CardHeader>
           <CardTitle>Activity Details</CardTitle>
@@ -591,7 +637,87 @@ const GymDashboardCharts = () => {
           </Tabs>
         </CardContent>
       </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Equipment Distribution</CardTitle>
+          <CardDescription>
+            Equipment availability and usage status
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <div className="flex justify-center items-center h-64">
+              <div className="text-sm text-muted-foreground">
+                Loading equipment distribution...
+              </div>
+            </div>
+          ) : error ? (
+            <div className="flex justify-center items-center h-64">
+              <div className="text-sm text-destructive">Error: {error}</div>
+            </div>
+          ) : equipmentData.length === 0 ? (
+            <div className="flex justify-center items-center h-64">
+              <div className="text-sm text-muted-foreground">
+                No equipment data available
+              </div>
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height={350}>
+              <BarChart
+                data={equipmentData}
+                margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis
+                  dataKey="equipmentName"
+                  tick={{ fontSize: 12 }}
+                  interval={0}
+                />
+                <YAxis />
+                <Tooltip
+                  formatter={(value, name) => {
+                    const statusMap: Record<string, string> = {
+                      available: "Available",
+                      inUse: "In Use",
+                      underMaintenance: "Under Maintenance",
+                    };
+                    return [
+                      `${value} units`,
+                      statusMap[name as string] || name,
+                    ];
+                  }}
+                />
+                <Legend
+                  formatter={(value) => {
+                    const statusMap: Record<string, string> = {
+                      available: "Available",
+                      inUse: "In Use",
+                      underMaintenance: "Under Maintenance",
+                    };
+                    return statusMap[value] || value;
+                  }}
+                />
+                <Bar
+                  dataKey="available"
+                  stackId="a"
+                  fill="#8884d8"
+                  name="available"
+                />
+                <Bar dataKey="inUse" stackId="a" fill="#82ca9d" name="inUse" />
+                <Bar
+                  dataKey="underMaintenance"
+                  stackId="a"
+                  fill="#487ABD"
+                  name="underMaintenance"
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </CardContent>
+      </Card>
     </div>
+    // </div>
   );
 };
 
